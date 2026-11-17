@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
+import { supabase } from './lib/supabase';
 import {
   MapPin, Phone, Mail, Building, Sparkles,
   ClipboardList, UserCheck, History, Send, RefreshCw, ExternalLink,
@@ -12,7 +13,6 @@ import {
   AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { supabase } from './lib/supabase';
 
 // ============================================================================
 // 1. INITIAL REALISTIC SEED DATA & CONSTANTS (SDN MERJOSARI 2 - MALANG)
@@ -1177,31 +1177,63 @@ function PublicGuestbook() {
   });
   const [receipt, setReceipt] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!form.name.trim() || !form.institution.trim() || !form.phone.trim() || !form.destination.trim()) {
       showToast('Mohon lengkapi Nama, Instansi, Nomor HP, dan Tujuan Kunjungan!', 'error');
       return;
     }
+
+    if (!supabase) {
+      showToast('Koneksi database belum tersedia. Silakan coba kembali.', 'error');
+      return;
+    }
+
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
-    const timeStr = now.toTimeString().slice(0, 5);
+    const pad = (value) => String(value).padStart(2, '0');
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const regNumber = `GT-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const newEntry = {
-      id: `gb-${Date.now()}`,
-      regNumber,
-      ...form,
-      date: dateStr,
-      time: timeStr,
-      verified: false
-    };
+    try {
+      const { error } = await supabase.from('guestbook').insert({
+        reg_number: regNumber,
+        name: form.name.trim(),
+        institution: form.institution.trim(),
+        phone: form.phone.trim(),
+        purpose: form.purpose,
+        destination: form.destination.trim(),
+        notes: form.notes.trim(),
+        visit_date: dateStr,
+        visit_time: timeStr,
+        verified: false
+      });
 
-    setDb(prev => ({ ...prev, guestbook: [newEntry, ...prev.guestbook] }));
-    addNotification('Buku Tamu Digital Baru', `${form.name} (${form.institution}) - ${form.destination}`, 'bukutamu');
-    setReceipt(newEntry);
-    showToast('Registrasi Buku Tamu berhasil tersimpan!');
-    setForm({ name: '', institution: '', phone: '', purpose: 'Kunjungan Dinas', destination: '', notes: '' });
+      if (error) {
+        console.error('Gagal menyimpan buku tamu ke Supabase:', error);
+        showToast('Data belum berhasil disimpan. Silakan coba kembali.', 'error');
+        return;
+      }
+
+      const newEntry = {
+        id: `gb-${Date.now()}`,
+        regNumber,
+        ...form,
+        date: dateStr,
+        time: timeStr,
+        verified: false
+      };
+
+      setDb(prev => ({ ...prev, guestbook: [newEntry, ...(prev.guestbook || [])] }));
+      addNotification('Buku Tamu Digital Baru', `${form.name} (${form.institution}) - ${form.destination}`, 'bukutamu');
+      setReceipt(newEntry);
+      showToast('Registrasi Buku Tamu berhasil tersimpan ke database!');
+      setForm({ name: '', institution: '', phone: '', purpose: 'Kunjungan Dinas', destination: '', notes: '' });
+    } catch (err) {
+      console.error('Kesalahan saat mengirim buku tamu:', err);
+      showToast('Terjadi kesalahan saat menghubungi database.', 'error');
+    }
   };
 
   return (
