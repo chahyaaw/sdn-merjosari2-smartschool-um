@@ -12,6 +12,7 @@ import {
   AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
+import { supabase } from './lib/supabase';
 
 // ============================================================================
 // 1. INITIAL REALISTIC SEED DATA & CONSTANTS (SDN MERJOSARI 2 - MALANG)
