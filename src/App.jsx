@@ -1,96 +1,160 @@
-import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
-import { supabase } from './lib/supabase';
-import {
-  MapPin, Phone, Mail, Building, Sparkles,
-  ClipboardList, UserCheck, History, Send, RefreshCw, ExternalLink,
-  AlertTriangle, LayoutDashboard, Menu, X,
-  Upload, Lock, User, Image as ImageIcon, Link2, Newspaper,
-  Shield, CheckCircle, LogIn, School, MessageSquare, Calendar as CalendarIcon,
-  ChevronRight, Printer, Search, Eye, Download, Users, LogOut, Bell,
-  Plus, Edit, Trash2
-} from 'lucide-react';
-import {
-  AreaChart, Area, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
-} from 'recharts';
+    }
+  }, [db]);
+
+  // Restore authenticated staff session from Supabase and resolve the trusted role.
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+
+    const loadStaffProfile = async (authUser) => {
+      if (!authUser) {
+        if (active) {
+          setCurrentUser(null);
+          setViewMode('public');
+        }
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('staff_profiles')
+        .select('role, display_name, phone')
+        .eq('id', authUser.id)
+        .single();
+
+      if (!active) return;
+      if (error || !profile || !['kepala_sekolah', 'guru'].includes(profile.role)) {
+        console.error('Profil petugas tidak ditemukan/valid:', error);
+        setCurrentUser(null);
+        setViewMode('public');
+        return;
+      }
+
+      const roleLabel = profile.role === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru';
+      setCurrentUser({
+        id: authUser.id,
+        email: authUser.email || '',
+        role: profile.role,
+        roleLabel,
+        name: profile.display_name || roleLabel,
+        phone: profile.phone || '',
+        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR',
+        photoUrl: ''
+      });
+      setViewMode('admin');
+    };
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) console.error('Gagal memulihkan sesi:', error);
+      loadStaffProfile(data?.session?.user || null);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Defer the profile query to avoid locking the Supabase auth event callback.
+      Promise.resolve().then(() => loadStaffProfile(session?.user || null));
+    });
+
+    return () => {
+      active = false;
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3800);
+  };
+
+  const addNotification = (title, message, targetTab = 'dashboard') => {
+    setDb(prev => ({
+      ...prev,
+      notifications: [
+        { id: `notif-${Date.now()}`, title, message, time: 'Baru saja', unread: true, targetTab },
+        ...prev.notifications
+      ]
+    }));
+  };
+
+  const resetDemoData = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setDb({
+      users: INITIAL_USERS,
+      guestbook: INITIAL_GUESTBOOK,
+      aspirasi: INITIAL_ASPIRASI,
+      dokumentasi: INITIAL_DOKUMENTASI,
+      pengumuman: INITIAL_PENGUMUMAN,
+      agendas: INITIAL_AGENDAS,
+      followUps: INITIAL_FOLLOWUPS,
+      notifications: []
+    });
+    showToast('Data simulasi berhasil dikembalikan ke pengaturan awal!', 'info');
+  };
+
+  return (
+    <SchoolContext.Provider value={{
+      db, setDb,
+      currentUser, setCurrentUser,
+      viewMode, setViewMode,
+      toast, showToast,
+      addNotification,
+      resetDemoData
+    }}>
+      {children}
+    </SchoolContext.Provider>
+  );
+}
+
+const useSchool = () => useContext(SchoolContext);
 
 // ============================================================================
-// 1. INITIAL REALISTIC SEED DATA & CONSTANTS (SDN MERJOSARI 2 - MALANG)
+// 5. HELPER COMPONENTS (BADGES, MODALS, AVATARS)
 // ============================================================================
 
-const STORAGE_KEY = 'sdn_merjosari_2_sim_v2';
+function StatusBadge({ status }) {
+  const styles = {
+    'Baru Masuk': 'bg-sky-100 text-sky-800 border-sky-200',
+    'Diverifikasi': 'bg-blue-100 text-blue-800 border-blue-200',
+    'Terverifikasi': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    'Dalam Tindak Lanjut': 'bg-amber-100 text-amber-800 border-amber-200',
+    'Sedang Berlangsung': 'bg-amber-100 text-amber-800 border-amber-200',
+    'Menunggu Persetujuan': 'bg-amber-100 text-amber-800 border-amber-200',
+    'Menunggu Verifikasi': 'bg-purple-100 text-purple-800 border-purple-200',
+    'Perlu Revisi': 'bg-orange-100 text-orange-800 border-orange-200',
+    'Perlu Perbaikan': 'bg-orange-100 text-orange-800 border-orange-200',
+    'Belum Dimulai': 'bg-slate-100 text-slate-700 border-slate-200',
+    'Draft': 'bg-slate-100 text-slate-700 border-slate-200',
+    'Internal': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    'Selesai': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    'Disetujui': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    'Terbit': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    'Publik': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    'Ditolak': 'bg-rose-100 text-rose-800 border-rose-200',
+    'Diarsipkan': 'bg-gray-200 text-gray-700 border-gray-300'
+  };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${styles[status] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+      {status}
+    </span>
+  );
+}
 
-const SCHOOL_INFO = {
-  name: 'SDN Merjosari 2',
-  npsn: '20534039',
-  address: 'Jl. Joyo Utomo I, Kec. Lowokwaru, Kota Malang, Prov. Jawa Timur',
-  phone: '(0341) 554020',
-  email: 'sdnmerjo_sari02@gmail.com',
-  visi: 'Peserta Didik Cerdas, Terampil dan Berkepribadian Baik Yang Dilandasi IMTAQ.',
-  misi: 'Melaksanakan Pembelajaran Secara Efektif Agar Siswa Berkembang Optimal Sesuai Dengan Potensi Yang Dimiliki.',
-  mapsEmbedUrl: 'https://maps.google.com/maps?q=Jl.%20Joyo%20Utomo%20I,%20Lowokwaru,%20Kota%20Malang,%20Jawa%20Timur&t=&z=16&ie=UTF8&iwloc=&output=embed',
-  mapsExternalUrl: 'https://www.google.com/maps/search/?api=1&query=Jl.+Joyo+Utomo+I,+Kec.+Lowokwaru,+Kota+Malang,+Prov.+Jawa+Timur'
-};
+function PriorityBadge({ priority }) {
+  const styles = {
+    'Rendah': 'bg-slate-100 text-slate-600',
+    'Sedang': 'bg-sky-100 text-sky-700',
+    'Tinggi': 'bg-amber-100 text-amber-800',
+    'Mendesak': 'bg-rose-100 text-rose-700 font-bold'
+  };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${styles[priority] || 'bg-slate-100 text-slate-700'}`}>
+      {priority}
+    </span>
+  );
+}
 
-const INITIAL_USERS = [
-  {
-    id: 'usr-kepsek',
-    username: 'kepsek',
-    role: 'kepala_sekolah',
-    roleLabel: 'Kepala Sekolah',
-    phone: '(0341) 554020',
-    email: 'sdnmerjo_sari02@gmail.com',
-    avatar: 'KS',
-    photoUrl: ''
-  },
-  {
-    id: 'usr-guru',
-    username: 'guru',
-    role: 'guru',
-    roleLabel: 'Guru',
-    phone: '(0341) 554020',
-    email: 'sdnmerjo_sari02@gmail.com',
-    avatar: 'GR',
-    photoUrl: ''
-  }
-];
-
-const INITIAL_GUESTBOOK = [
-  {
-    id: 'gb-1',
-    regNumber: 'GT-2026-1041',
-    name: 'Drs. Hendra Gunawan',
-    institution: 'Dinas Pendidikan Kota Malang',
-    phone: '0812-3300-1188',
-    purpose: 'Kunjungan Dinas',
-    destination: 'Bertemu Kepala Sekolah terkait monitoring ANBK',
-    notes: 'Monitoring kesiapan Asesmen Nasional Berbasis Komputer (ANBK)',
-    date: '2026-11-16',
-    time: '09:15',
-    verified: true
-  },
-  {
-    id: 'gb-2',
-    regNumber: 'GT-2026-1042',
-    name: 'Ratna Sari Dewi',
-    institution: 'Wali Murid Kelas III-B',
-    phone: '0857-9088-2211',
-    purpose: 'Wali Murid',
-    destination: 'Konsultasi dengan Wali Kelas III-B',
-    notes: 'Konsultasi perkembangan literasi dan administrasi mutasi alamat',
-    date: '2026-11-17',
-    time: '08:30',
-    verified: false
-  },
-  {
-    id: 'gb-3',
-    regNumber: 'GT-2026-1043',
-    name: 'M. Rizky Pratama',
-    institution: 'Universitas Negeri Malang (UM)',
-    phone: '0813-5566-7788',
-    purpose: 'Penelitian/Magang',
-    destination: 'Pengajuan surat izin observasi kelas IV',
-    notes: 'Pengajuan izin observasi media pembelajaran digital kelas IV',
-    date: '2026-11-17',
-    time: '10:40',
-    verified: false
+function UserAvatar({ user, size = 'w-10 h-10 text-sm' }) {
+  if (user?.photoUrl) {
+    return (
+      <img
+        src={user.photoUrl}
+        alt={user.roleLabel}
+        className={`${size} rounded-full object-cover border border-slate-200 shrink-0`}
