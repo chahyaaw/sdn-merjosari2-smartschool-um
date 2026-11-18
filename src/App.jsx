@@ -3523,30 +3523,37 @@ function AdminFollowUpModule() {
     if (!confirmed) return;
     if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
 
-    try {
-      const { error: deleteError } = await supabase
-        .from('follow_ups')
-        .delete()
-        .eq('id', fu.id);
-      if (deleteError) throw deleteError;
+    // Hapus record terlebih dahulu. Setelah database mengonfirmasi, perbarui UI
+    // segera agar daftar tidak menampilkan item yang sebenarnya sudah terhapus.
+    const { error: deleteError } = await supabase
+      .from('follow_ups')
+      .delete()
+      .eq('id', fu.id);
+    if (deleteError) {
+      console.error('Gagal menghapus tindak lanjut:', deleteError);
+      showToast(`Tindak lanjut gagal dihapus: ${deleteError.message}`, 'error');
+      return;
+    }
 
-      // Hapus file bukti yang tersimpan setelah data tindak lanjut berhasil dihapus.
-      if (fu.evidenceFilePath && !fu.evidenceFilePath.startsWith('http') && !fu.evidenceFilePath.startsWith('data:')) {
-        const { error: storageError } = await supabase.storage
-          .from('follow-up-evidence')
-          .remove([fu.evidenceFilePath]);
-        if (storageError) console.warn('Tindak lanjut terhapus, tetapi file bukti gagal dibersihkan:', storageError.message);
-      }
+    setDb(prev => ({ ...prev, followUps: prev.followUps.filter(item => item.id !== fu.id) }));
+    if (detailModal?.id === fu.id) setDetailModal(null);
 
-      let aspirasiStatus = null;
-      if (fu.linkedAspirasiId) {
+    if (fu.evidenceFilePath && !fu.evidenceFilePath.startsWith('http') && !fu.evidenceFilePath.startsWith('data:')) {
+      const { error: storageError } = await supabase.storage
+        .from('follow-up-evidence')
+        .remove([fu.evidenceFilePath]);
+      if (storageError) console.warn('Tindak lanjut terhapus, tetapi file bukti gagal dibersihkan:', storageError.message);
+    }
+
+    if (fu.linkedAspirasiId) {
+      try {
         const { data: remaining, error: remainingError } = await supabase
           .from('follow_ups')
           .select('id,status')
           .eq('linked_aspirasi_id', fu.linkedAspirasiId);
         if (remainingError) throw remainingError;
 
-        aspirasiStatus = remaining?.length
+        const aspirasiStatus = remaining?.length
           ? (remaining.every(item => item.status === 'Selesai') ? 'Selesai' : 'Dalam Tindak Lanjut')
           : 'Baru Masuk';
 
@@ -3554,32 +3561,29 @@ function AdminFollowUpModule() {
           .from('aspirasi')
           .update({ status: aspirasiStatus })
           .eq('id', fu.linkedAspirasiId);
-        if (ticketError) {
-          console.error('Tindak lanjut terhapus, tetapi status tiket aspirasi gagal disinkronkan:', ticketError);
-          showToast(`Tindak lanjut terhapus, tetapi status tiket aspirasi belum tersinkron: ${ticketError.message}`, 'error');
-        } else {
-          const { error: historyError } = await supabase.from('aspirasi_history').insert({
-            aspirasi_id: fu.linkedAspirasiId,
-            status: aspirasiStatus,
-            note: `Tindak lanjut ${fu.code} dihapus oleh petugas.`
-          });
-          if (historyError) console.error('Riwayat perubahan tiket gagal disimpan:', historyError);
-        }
-      }
+        if (ticketError) throw ticketError;
 
-      setDb(prev => ({
-        ...prev,
-        followUps: prev.followUps.filter(item => item.id !== fu.id),
-        aspirasi: fu.linkedAspirasiId && aspirasiStatus
-          ? prev.aspirasi.map(item => item.id === fu.linkedAspirasiId ? { ...item, status: aspirasiStatus } : item)
-          : prev.aspirasi
-      }));
-      if (detailModal?.id === fu.id) setDetailModal(null);
-      showToast(`Tindak lanjut "${fu.title}" berhasil dihapus.`);
-    } catch (error) {
-      console.error('Gagal menghapus tindak lanjut:', error);
-      showToast(`Tindak lanjut gagal dihapus: ${error.message}`, 'error');
+        const { error: historyError } = await supabase.from('aspirasi_history').insert({
+          aspirasi_id: fu.linkedAspirasiId,
+          status: aspirasiStatus,
+          note: `Tindak lanjut ${fu.code} dihapus oleh petugas.`
+        });
+        if (historyError) console.error('Riwayat perubahan tiket gagal disimpan:', historyError);
+
+        setDb(prev => ({
+          ...prev,
+          aspirasi: prev.aspirasi.map(item => item.id === fu.linkedAspirasiId
+            ? { ...item, status: aspirasiStatus }
+            : item)
+        }));
+      } catch (syncError) {
+        console.error('Tindak lanjut terhapus, tetapi sinkronisasi tiket aspirasi gagal:', syncError);
+        showToast(`Tindak lanjut terhapus, tetapi status tiket belum tersinkron: ${syncError.message}`, 'error');
+        return;
+      }
     }
+
+    showToast(`Tindak lanjut "${fu.title}" berhasil dihapus.`);
   };
 
   const createFollowUp = async (e) => {
