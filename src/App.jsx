@@ -707,8 +707,22 @@ function SchoolProvider({ children }) {
       }
     });
 
+    // Fallback synchronization: refresh staff/public data periodically even if
+    // a Realtime notification is missed or the socket reconnects late.
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') loadSchoolData();
+    }, 10000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadSchoolData();
+    };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+
     return () => {
       active = false;
+      window.clearInterval(refreshInterval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
       supabase.removeChannel(liveChannel);
     };
   }, [currentUser?.id]);
