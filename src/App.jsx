@@ -3516,6 +3516,72 @@ function AdminFollowUpModule() {
     });
   };
 
+  const handleDeleteFollowUp = async (fu) => {
+    const confirmed = window.confirm(
+      `Hapus tindak lanjut "${fu.title}" (${fu.code})? Data rencana dan timeline tindak lanjut ini akan dihapus.`
+    );
+    if (!confirmed) return;
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('follow_ups')
+        .delete()
+        .eq('id', fu.id);
+      if (deleteError) throw deleteError;
+
+      // Hapus file bukti yang tersimpan setelah data tindak lanjut berhasil dihapus.
+      if (fu.evidenceFilePath && !fu.evidenceFilePath.startsWith('http') && !fu.evidenceFilePath.startsWith('data:')) {
+        const { error: storageError } = await supabase.storage
+          .from('follow-up-evidence')
+          .remove([fu.evidenceFilePath]);
+        if (storageError) console.warn('Tindak lanjut terhapus, tetapi file bukti gagal dibersihkan:', storageError.message);
+      }
+
+      let aspirasiStatus = null;
+      if (fu.linkedAspirasiId) {
+        const { data: remaining, error: remainingError } = await supabase
+          .from('follow_ups')
+          .select('id,status')
+          .eq('linked_aspirasi_id', fu.linkedAspirasiId);
+        if (remainingError) throw remainingError;
+
+        aspirasiStatus = remaining?.length
+          ? (remaining.every(item => item.status === 'Selesai') ? 'Selesai' : 'Dalam Tindak Lanjut')
+          : 'Baru Masuk';
+
+        const { error: ticketError } = await supabase
+          .from('aspirasi')
+          .update({ status: aspirasiStatus })
+          .eq('id', fu.linkedAspirasiId);
+        if (ticketError) {
+          console.error('Tindak lanjut terhapus, tetapi status tiket aspirasi gagal disinkronkan:', ticketError);
+          showToast(`Tindak lanjut terhapus, tetapi status tiket aspirasi belum tersinkron: ${ticketError.message}`, 'error');
+        } else {
+          const { error: historyError } = await supabase.from('aspirasi_history').insert({
+            aspirasi_id: fu.linkedAspirasiId,
+            status: aspirasiStatus,
+            note: `Tindak lanjut ${fu.code} dihapus oleh petugas.`
+          });
+          if (historyError) console.error('Riwayat perubahan tiket gagal disimpan:', historyError);
+        }
+      }
+
+      setDb(prev => ({
+        ...prev,
+        followUps: prev.followUps.filter(item => item.id !== fu.id),
+        aspirasi: fu.linkedAspirasiId && aspirasiStatus
+          ? prev.aspirasi.map(item => item.id === fu.linkedAspirasiId ? { ...item, status: aspirasiStatus } : item)
+          : prev.aspirasi
+      }));
+      if (detailModal?.id === fu.id) setDetailModal(null);
+      showToast(`Tindak lanjut "${fu.title}" berhasil dihapus.`);
+    } catch (error) {
+      console.error('Gagal menghapus tindak lanjut:', error);
+      showToast(`Tindak lanjut gagal dihapus: ${error.message}`, 'error');
+    }
+  };
+
   const createFollowUp = async (e) => {
     e.preventDefault();
     if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
@@ -3712,9 +3778,19 @@ function AdminFollowUpModule() {
               </div>
             </div>
 
-            <button onClick={() => openDetail(fu)} className="w-full py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition">
-              Update Timeline & {isGuru ? 'Upload Foto Bukti' : 'Upload Foto / File'}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => openDetail(fu)} className="w-full py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition">
+                Update Timeline & {isGuru ? 'Upload Foto Bukti' : 'Upload Foto / File'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteFollowUp(fu)}
+                className="w-full py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition inline-flex items-center justify-center gap-1"
+                title="Hapus tindak lanjut"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Hapus
+              </button>
+            </div>
           </div>
         ))}
       </div>
