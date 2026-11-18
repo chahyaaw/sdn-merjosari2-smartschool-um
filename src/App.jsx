@@ -685,15 +685,8 @@ function PublicPortal({ onOpenLogin }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-3">
             <button onClick={() => navigate('beranda')} className="flex items-center gap-3 text-left group">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center group-hover:scale-105 transition">
-                <img
-                  src="/school-logo.jpg"
-                  alt="Logo SDN Merjosari 2"
-                  className="block w-full h-full object-contain opacity-100 mix-blend-normal"
-                  style={{ background: 'transparent', filter: 'none' }}
-                  width="56"
-                  height="56"
-                />
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-700 to-sky-500 text-white flex items-center justify-center shadow-md shadow-blue-600/20 group-hover:scale-105 transition">
+                <School className="w-6 h-6" />
               </div>
               <div>
                 <div className="font-['Poppins'] font-bold text-base sm:text-lg text-blue-950 leading-tight">
@@ -1286,12 +1279,7 @@ function PublicGuestbook() {
                 <div className="flex justify-between gap-2"><span className="text-emerald-100 shrink-0">Tujuan:</span><span className="font-semibold text-right">{receipt.destination}</span></div>
                 <div className="flex justify-between"><span className="text-emerald-100">Waktu:</span><span className="font-semibold">{receipt.date} • {receipt.time} WIB</span></div>
               </div>
-              <button
-                onClick={() => window.print()}
-                className="w-full py-2.5 rounded-xl bg-white text-emerald-800 font-semibold text-xs hover:bg-emerald-50 transition flex items-center justify-center gap-2"
-              >
-                <Printer className="w-4 h-4" /> Cetak Bukti Kunjungan
-              </button>
+
             </div>
           ) : (
             <div className="bg-blue-50 border border-blue-100 rounded-3xl p-6 space-y-3">
