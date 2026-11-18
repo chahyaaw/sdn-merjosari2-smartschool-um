@@ -1579,7 +1579,6 @@ function PublicAspirasi() {
         priority: 'Sedang',
         createdAt: dateStr,
         publicNote: payload.public_note,
-        internalNote: '',
         linkedFollowUpId: null,
         history: [{ date: new Date().toLocaleString('id-ID'), status: 'Baru Masuk', note: 'Aspirasi dikirimkan melalui portal publik.' }]
       };
