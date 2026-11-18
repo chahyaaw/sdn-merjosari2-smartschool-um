@@ -280,7 +280,21 @@ function SchoolProvider({ children }) {
     const channel = supabase.channel('school-guestbook-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'guestbook' }, loadGuestbook)
       .subscribe();
-    return () => { active = false; supabase.removeChannel(channel); };
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') loadGuestbook();
+    }, 10000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadGuestbook();
+    };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(refreshInterval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
+      supabase.removeChannel(channel);
+    };
   }, [currentUser?.id]);
 
   // Load school content from Supabase. Public visitors only receive published/public rows;
@@ -369,7 +383,7 @@ function SchoolProvider({ children }) {
             status: row.status || 'Baru Masuk',
             priority: row.priority || 'Sedang',
             createdAt: (row.created_at || '').slice(0, 10),
-            publicNote: row.public_note || '', internalNote: row.internal_note || '',
+            publicNote: row.public_note || '',
             linkedFollowUpId: null, history: historyByAspirasi[row.id] || []
           })));
         } else {
@@ -2237,13 +2251,33 @@ function AdminOverview({ onNavigate }) {
   const activeFollowUps = db.followUps.filter(f => f.status !== 'Selesai').length;
   const pendingAgendas = db.agendas.filter(a => a.status === 'Menunggu Persetujuan').length;
 
-  const monthlyTrendData = [
-    { bulan: 'Jul', pengunjung: 24, aspirasi: 5 },
-    { bulan: 'Agu', pengunjung: 31, aspirasi: 8 },
-    { bulan: 'Sep', pengunjung: 28, aspirasi: 6 },
-    { bulan: 'Okt', pengunjung: 39, aspirasi: 11 },
-    { bulan: 'Nov', pengunjung: db.guestbook.length + 22, aspirasi: db.aspirasi.length + 4 }
-  ];
+  const monthlyTrendData = useMemo(() => {
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_, index) => {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+      const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+      return {
+        key,
+        bulan: new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(monthDate),
+        pengunjung: 0,
+        aspirasi: 0
+      };
+    });
+    const monthIndex = new Map(months.map((month, index) => [month.key, index]));
+
+    db.guestbook.forEach(visitor => {
+      const key = String(visitor.date || '').slice(0, 7);
+      const index = monthIndex.get(key);
+      if (index !== undefined) months[index].pengunjung += 1;
+    });
+    db.aspirasi.forEach(ticket => {
+      const key = String(ticket.createdAt || '').slice(0, 7);
+      const index = monthIndex.get(key);
+      if (index !== undefined) months[index].aspirasi += 1;
+    });
+
+    return months.map(({ bulan, pengunjung, aspirasi }) => ({ bulan, pengunjung, aspirasi }));
+  }, [db.guestbook, db.aspirasi]);
 
   const aspirasiCategoryData = useMemo(() => {
     const counts = {};
@@ -2952,7 +2986,7 @@ function AdminAspirasiModule({ onNavigate }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Semua');
   const [selectedItem, setSelectedItem] = useState(null);
-  const [editState, setEditState] = useState({ status: '', priority: '', publicNote: '', internalNote: '' });
+  const [editState, setEditState] = useState({ status: '', priority: '', publicNote: '' });
 
   const filtered = db.aspirasi.filter(a => {
     const matchSearch =
@@ -2968,8 +3002,7 @@ function AdminAspirasiModule({ onNavigate }) {
     setEditState({
       status: item.status,
       priority: item.priority,
-      publicNote: item.publicNote || '',
-      internalNote: item.internalNote || ''
+      publicNote: item.publicNote || ''
     });
   };
 
@@ -2978,7 +3011,7 @@ function AdminAspirasiModule({ onNavigate }) {
     const note = editState.publicNote || `Status diperbarui menjadi ${editState.status}`;
     const { data, error } = await supabase.from('aspirasi').update({
       status: editState.status, priority: editState.priority,
-      public_note: editState.publicNote, internal_note: editState.internalNote
+      public_note: editState.publicNote
     }).eq('id', selectedItem.id).select('*').single();
     if (error) { console.error(error); showToast(`Aspirasi gagal diperbarui: ${error.message}`, 'error'); return; }
     const historyResult = await supabase.from('aspirasi_history').insert({
@@ -2987,11 +3020,51 @@ function AdminAspirasiModule({ onNavigate }) {
     if (historyResult.error) { console.error(historyResult.error); showToast(`Status tersimpan, tetapi riwayat gagal: ${historyResult.error.message}`, 'error'); }
     setDb(prev => ({ ...prev, aspirasi: prev.aspirasi.map(a => a.id === selectedItem.id ? {
       ...a, status: data.status, priority: data.priority, publicNote: data.public_note || '',
-      internalNote: data.internal_note || '',
       history: [...(a.history || []), { date: new Date().toISOString().slice(0, 16).replace('T', ' '), status: data.status, note }]
     } : a) }));
     showToast(`Tiket ${selectedItem.ticketNumber} berhasil diperbarui!`);
     setSelectedItem(null);
+  };
+
+  const handleDeleteAspirasi = async (item) => {
+    const confirmed = window.confirm(
+      `Hapus tiket aspirasi ${item.ticketNumber}? Riwayat tiket akan ikut terhapus. Tindak lanjut yang sudah dibuat tetap disimpan, tetapi akan dilepaskan dari tiket ini.`
+    );
+    if (!confirmed) return;
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+    try {
+      const { error: detachError } = await supabase
+        .from('follow_ups')
+        .update({ linked_aspirasi_id: null })
+        .eq('linked_aspirasi_id', item.id);
+      if (detachError) throw new Error(`Tindak lanjut terkait gagal dilepaskan: ${detachError.message}`);
+
+      const { error: deleteError } = await supabase
+        .from('aspirasi')
+        .delete()
+        .eq('id', item.id);
+      if (deleteError) throw deleteError;
+
+      if (item.attachment && !item.attachment.startsWith('http') && !item.attachment.startsWith('data:')) {
+        const { error: storageError } = await supabase.storage
+          .from('aspirasi-attachments')
+          .remove([item.attachment]);
+        if (storageError) console.warn('Tiket terhapus, tetapi foto lampiran gagal dibersihkan:', storageError.message);
+      }
+
+      setDb(prev => ({
+        ...prev,
+        aspirasi: prev.aspirasi.filter(a => a.id !== item.id),
+        followUps: prev.followUps.map(f => f.linkedAspirasiId === item.id
+          ? { ...f, linkedAspirasiId: null, sourceRef: '' }
+          : f)
+      }));
+      if (selectedItem?.id === item.id) setSelectedItem(null);
+      showToast(`Tiket ${item.ticketNumber} berhasil dihapus.`);
+    } catch (error) {
+      console.error('Gagal menghapus aspirasi:', error);
+      showToast(`Aspirasi gagal dihapus: ${error.message}`, 'error');
+    }
   };
 
   const createFollowUpFromAspirasi = async (item) => {
@@ -3102,12 +3175,22 @@ function AdminAspirasiModule({ onNavigate }) {
                     <StatusBadge status={item.status} />
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    <button
-                      onClick={() => openManageModal(item)}
-                      className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition"
-                    >
-                      Kelola Tiket
-                    </button>
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        onClick={() => openManageModal(item)}
+                        className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition"
+                      >
+                        Kelola Tiket
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAspirasi(item)}
+                        className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition inline-flex items-center gap-1"
+                        title="Hapus tiket aspirasi"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Hapus
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -3176,16 +3259,6 @@ function AdminAspirasiModule({ onNavigate }) {
                 rows={2}
                 value={editState.publicNote}
                 onChange={e => setEditState({ ...editState, publicNote: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Internal Sekolah</label>
-              <textarea
-                rows={2}
-                value={editState.internalNote}
-                onChange={e => setEditState({ ...editState, internalNote: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"
               />
             </div>
