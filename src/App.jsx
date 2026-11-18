@@ -368,7 +368,7 @@ function SchoolProvider({ children }) {
             actionPlan: row.description || '',
             pic: row.responsible_person || '', priority: row.priority || 'Sedang',
             deadline: row.target_date || '', status: row.status || 'Belum Dimulai',
-            evidenceNote: row.evidence_note || '', evidenceFileName: row.evidence_file_name || '',
+            evidenceFileName: row.evidence_file_name || '',
             evidenceFilePath: row.evidence_url || '',
             evidenceFileUrl: await getFollowUpEvidenceUrl(row.evidence_url || ''),
             timeline: row.timeline || []
@@ -3392,7 +3392,7 @@ function AdminFollowUpModule() {
       category: isGuru ? 'Aspirasi' : form.sourceType, status: form.status,
       priority: form.priority, responsible_person: form.pic || null,
       target_date: form.deadline || null, linked_aspirasi_id: linkedAspirasi?.id || null,
-      evidence_url: evidencePath, evidence_note: form.evidenceFileName ? `Lampiran awal: ${form.evidenceFileName}` : '',
+      evidence_url: evidencePath,
       evidence_file_name: form.evidenceFileName || '', timeline
     };
     const { data, error } = await supabase.from('follow_ups').insert(payload).select('*').single();
