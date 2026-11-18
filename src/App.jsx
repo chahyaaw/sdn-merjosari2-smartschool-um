@@ -451,22 +451,23 @@ function SchoolProvider({ children }) {
   const loadState = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Private guestbook records are never restored from browser storage.
+        return { ...parsed, guestbook: [] };
+      }
     } catch (e) {
       console.error('Failed loading state:', e);
     }
     return {
       users: INITIAL_USERS,
-      guestbook: INITIAL_GUESTBOOK,
+      guestbook: [],
       aspirasi: INITIAL_ASPIRASI,
       dokumentasi: INITIAL_DOKUMENTASI,
       pengumuman: INITIAL_PENGUMUMAN,
       agendas: INITIAL_AGENDAS,
       followUps: INITIAL_FOLLOWUPS,
-      notifications: [
-        { id: 'n-1', title: 'Pengunjung Baru Tercatat', message: 'M. Rizky Pratama (UM) mengisi Buku Tamu Digital', time: 'Baru saja', unread: true, targetTab: 'bukutamu' },
-        { id: 'n-2', title: 'Aspirasi Masyarakat', message: 'Tiket ASP-2026-8822 menunggu tindak lanjut', time: 'Hari ini', unread: true, targetTab: 'aspirasi' }
-      ]
+      notifications: []
     };
   };
 
@@ -477,11 +478,77 @@ function SchoolProvider({ children }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      // Do not cache personal visitor records in localStorage.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...db, guestbook: [] }));
     } catch (e) {
       console.error('Failed saving state:', e);
     }
   }, [db]);
+
+  // Restore signed-in staff from Supabase Auth and trust only the database role.
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    const resolveStaff = async (authUser) => {
+      if (!authUser) {
+        if (active) { setCurrentUser(null); setViewMode('public'); }
+        return;
+      }
+      const { data: profile, error } = await supabase
+        .from('staff_profiles').select('role, display_name, phone')
+        .eq('id', authUser.id).maybeSingle();
+      if (!active) return;
+      if (error || !profile || !['kepala_sekolah', 'guru'].includes(profile.role)) {
+        console.error('Profil petugas tidak valid:', error?.message);
+        setCurrentUser(null); setViewMode('public'); return;
+      }
+      const roleLabel = profile.role === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru';
+      setCurrentUser({
+        id: authUser.id, email: authUser.email || '', role: profile.role, roleLabel,
+        name: profile.display_name || roleLabel, phone: profile.phone || '',
+        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR', photoUrl: ''
+      });
+      setViewMode('admin');
+    };
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) console.error('Gagal memulihkan sesi:', error.message);
+      resolveStaff(data?.session?.user || null);
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      Promise.resolve().then(() => resolveStaff(session?.user || null));
+    });
+    return () => {
+      active = false;
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  // Visitor details are fetched only for an authenticated staff member.
+  useEffect(() => {
+    if (!supabase || !currentUser?.id) return;
+    let active = true;
+    const loadGuestbook = async () => {
+      const { data, error } = await supabase.from('guestbook').select('*').order('created_at', { ascending: false });
+      if (!active) return;
+      if (error) {
+        console.error('Gagal memuat buku tamu:', error.message);
+        showToast('Data buku tamu belum dapat dimuat dari database.', 'error');
+        return;
+      }
+      const guests = (data || []).map(row => ({
+        id: row.id, regNumber: row.reg_number, name: row.name, institution: row.institution,
+        phone: row.phone || '', purpose: row.purpose || '', destination: row.destination || '',
+        notes: row.notes || '', date: row.visit_date || '', time: String(row.visit_time || '').slice(0, 5),
+        verified: Boolean(row.verified)
+      }));
+      setDb(prev => ({ ...prev, guestbook: guests }));
+    };
+    loadGuestbook();
+    const channel = supabase.channel('school-guestbook-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guestbook' }, loadGuestbook)
+      .subscribe();
+    return () => { active = false; supabase.removeChannel(channel); };
+  }, [currentUser?.id]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -616,24 +683,53 @@ function Modal({ open, onClose, title, maxWidth = 'max-w-2xl', children }) {
 // ============================================================================
 
 function LoginModal({ open, onClose }) {
-  const { db, setCurrentUser, setViewMode, showToast } = useSchool();
+  const { setCurrentUser, setViewMode, showToast } = useSchool();
   const [selectedRole, setSelectedRole] = useState('kepala_sekolah');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    const found = db.users.find(u => u.role === selectedRole && u.password === password);
-    if (!found) {
-      setError('Kata sandi tidak sesuai. Silakan periksa kembali kata sandi peran Anda.');
-      return;
-    }
-    setCurrentUser(found);
-    setViewMode('admin');
     setError('');
-    setPassword('');
-    showToast(`Berhasil masuk ke Portal ${found.roleLabel}!`);
-    onClose();
+    if (!supabase) { setError('Koneksi Supabase belum tersedia.'); return; }
+    if (!email.trim() || !password) { setError('Email dan kata sandi wajib diisi.'); return; }
+    setLoading(true);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(), password
+      });
+      if (authError || !authData?.user) {
+        setError('Email atau kata sandi tidak sesuai.'); return;
+      }
+      const { data: profile, error: profileError } = await supabase
+        .from('staff_profiles').select('role, display_name, phone')
+        .eq('id', authData.user.id).maybeSingle();
+      if (profileError || !profile || !['kepala_sekolah', 'guru'].includes(profile.role)) {
+        await supabase.auth.signOut();
+        setError('Akun ini belum memiliki profil petugas yang diizinkan.'); return;
+      }
+      if (profile.role !== selectedRole) {
+        await supabase.auth.signOut();
+        setError('Peran akun tidak sesuai dengan pilihan. Silakan pilih peran yang benar.'); return;
+      }
+      const roleLabel = profile.role === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru';
+      setCurrentUser({
+        id: authData.user.id, email: authData.user.email || email.trim(), role: profile.role, roleLabel,
+        name: profile.display_name || roleLabel, phone: profile.phone || '',
+        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR', photoUrl: ''
+      });
+      setViewMode('admin');
+      setPassword('');
+      showToast(`Berhasil masuk ke Portal ${roleLabel}!`);
+      onClose();
+    } catch (err) {
+      console.error('Login Supabase gagal:', err);
+      setError('Terjadi kendala saat menghubungi server. Coba kembali.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -642,73 +738,39 @@ function LoginModal({ open, onClose }) {
         <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-100 flex items-start gap-3">
           <Shield className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
           <div className="text-xs text-blue-900 leading-relaxed">
-            Pilih peran akses (<strong>Kepala Sekolah</strong> atau <strong>Guru</strong>) dan masukkan kata sandi masing-masing untuk masuk ke sistem.
+            Masuk menggunakan akun resmi petugas. Hak akses ditentukan dari profil petugas di database sekolah.
           </div>
         </div>
-
-        {/* Role Selector Cards (No Personal Names) */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pilih Peran Akses</label>
-          <div className="grid grid-cols-2 gap-3">
-            {db.users.map(u => {
-              const isSelected = selectedRole === u.role;
-              return (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => { setSelectedRole(u.role); setError(''); }}
-                  className={`p-3.5 rounded-2xl border-2 transition text-left flex flex-col gap-2 ${
-                    isSelected
-                      ? 'border-blue-700 bg-blue-50/70 shadow-xs'
-                      : 'border-slate-200 hover:border-blue-300 bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <UserAvatar user={u} size="w-9 h-9 text-xs" />
-                    {isSelected && <CheckCircle className="w-4 h-4 text-blue-700" />}
-                  </div>
-                  <div>
-                    <div className="font-['Poppins'] font-bold text-sm text-slate-900">{u.roleLabel}</div>
-                    <div className="text-[11px] text-slate-500">Sandi default: <span className="font-mono font-semibold text-blue-700">{u.password}</span></div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          {[{role:'kepala_sekolah',label:'Kepala Sekolah',avatar:'KS'},{role:'guru',label:'Guru',avatar:'GR'}].map(item => (
+            <button key={item.role} type="button" onClick={() => { setSelectedRole(item.role); setError(''); }}
+              className={`p-3.5 rounded-2xl border-2 text-left ${selectedRole===item.role?'border-blue-700 bg-blue-50':'border-slate-200 bg-white'}`}>
+              <div className="w-9 h-9 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs mb-2">{item.avatar}</div>
+              <div className="font-['Poppins'] font-bold text-sm text-slate-900">{item.label}</div>
+            </button>
+          ))}
         </div>
-
         <form onSubmit={handleLogin} className="space-y-4 pt-3 border-t border-slate-100">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Kata Sandi ({selectedRole === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru'})
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="Masukkan kata sandi..."
-              />
-            </div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Email Petugas</label>
+            <input type="email" required autoComplete="username" value={email} onChange={e=>setEmail(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" placeholder="Email akun petugas" />
           </div>
-
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Kata Sandi</label>
+            <input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" placeholder="Masukkan kata sandi" />
+          </div>
           {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
-
-          <button
-            type="submit"
-            className="w-full py-2.5 px-4 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm shadow-md shadow-blue-700/20 transition flex items-center justify-center gap-2"
-          >
-            <LogIn className="w-4 h-4" /> Masuk sebagai {selectedRole === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru'}
+          <button type="submit" disabled={loading}
+            className="w-full py-2.5 px-4 rounded-xl bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold text-sm flex items-center justify-center gap-2">
+            <LogIn className="w-4 h-4" /> {loading ? 'Memeriksa akun...' : 'Masuk ke Portal Petugas'}
           </button>
         </form>
       </div>
     </Modal>
   );
 }
-
 // ============================================================================
 // 7. PUBLIC WEBSITE INTERFACE (TAMPILAN PUBLIK)
 // ============================================================================
@@ -1979,9 +2041,14 @@ function AdminDashboard() {
     }));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (supabase) {
+      const { error } = await supabase.auth.signOut();
+      if (error) { showToast('Gagal keluar dari sesi: ' + error.message, 'error'); return; }
+    }
     setCurrentUser(null);
     setViewMode('public');
+    setDb(prev => ({ ...prev, guestbook: [] }));
     showToast('Anda telah keluar dari portal.', 'info');
   };
 
@@ -3090,12 +3157,11 @@ function AdminGuestbookModule() {
     return matchSearch && matchPurpose;
   });
 
-  const toggleVerifyGuest = (guest) => {
+  const toggleVerifyGuest = async (guest) => {
     const nextState = !guest.verified;
-    setDb(prev => ({
-      ...prev,
-      guestbook: prev.guestbook.map(g => g.id === guest.id ? { ...g, verified: nextState } : g)
-    }));
+    const { error } = await supabase.from('guestbook').update({ verified: nextState }).eq('id', guest.id);
+    if (error) { showToast('Gagal memperbarui database: ' + error.message, 'error'); return; }
+    setDb(prev => ({ ...prev, guestbook: prev.guestbook.map(g => g.id === guest.id ? { ...g, verified: nextState } : g) }));
     showToast(nextState ? `Kunjungan ${guest.regNumber} telah diverifikasi!` : `Verifikasi ${guest.regNumber} dibatalkan.`);
   };
 
@@ -3111,28 +3177,36 @@ function AdminGuestbookModule() {
     showToast('Laporan Buku Tamu (Excel/CSV) berhasil diunduh!');
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (editing) {
+      const { error } = await supabase.from('guestbook').update({
+        name: form.name, institution: form.institution, phone: form.phone,
+        purpose: form.purpose, destination: form.destination, notes: form.notes
+      }).eq('id', editing.id);
+      if (error) { showToast('Gagal memperbarui database: ' + error.message, 'error'); return; }
       setDb(prev => ({ ...prev, guestbook: prev.guestbook.map(g => g.id === editing.id ? { ...g, ...form } : g) }));
       showToast('Data kunjungan diperbarui!');
     } else {
       const now = new Date();
-      const newEntry = {
-        id: `gb-${Date.now()}`,
-        regNumber: `GT-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-        ...form,
-        date: now.toISOString().slice(0, 10),
-        time: now.toTimeString().slice(0, 5),
-        verified: true
-      };
+      const regNumber = `GT-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const id = crypto.randomUUID();
+      const newEntry = { id, regNumber, ...form, date: now.toISOString().slice(0, 10), time: now.toTimeString().slice(0, 5), verified: true };
+      const { error } = await supabase.from('guestbook').insert({
+        id, reg_number: regNumber, name: form.name, institution: form.institution, phone: form.phone,
+        purpose: form.purpose, destination: form.destination, notes: form.notes,
+        visit_date: newEntry.date, visit_time: newEntry.time, verified: true
+      });
+      if (error) { showToast('Gagal menyimpan database: ' + error.message, 'error'); return; }
       setDb(prev => ({ ...prev, guestbook: [newEntry, ...prev.guestbook] }));
       showToast('Data kunjungan baru ditambahkan!');
     }
     setModalOpen(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
+    const { error } = await supabase.from('guestbook').delete().eq('id', id);
+    if (error) { showToast('Gagal menghapus data: ' + error.message, 'error'); return; }
     setDb(prev => ({ ...prev, guestbook: prev.guestbook.filter(g => g.id !== id) }));
     showToast('Data kunjungan dihapus.', 'info');
   };
