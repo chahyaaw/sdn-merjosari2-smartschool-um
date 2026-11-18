@@ -1423,10 +1423,38 @@ function PublicAspirasi() {
   });
   const [createdTicket, setCreatedTicket] = useState(null);
   const [trackInput, setTrackInput] = useState('');
+  const [trackedResult, setTrackedResult] = useState(null);
+  const [isTracking, setIsTracking] = useState(false);
 
-  const trackedItem = useMemo(() => {
-    return db.aspirasi.find(a => a.ticketNumber.toLowerCase() === trackInput.trim().toLowerCase());
-  }, [db.aspirasi, trackInput]);
+  const trackedItem = trackedResult?.ticketNumber?.toLowerCase() === trackInput.trim().toLowerCase()
+    ? trackedResult
+    : db.aspirasi.find(a => a.ticketNumber?.toLowerCase() === trackInput.trim().toLowerCase());
+
+  const handleTrackAspirasi = async (event) => {
+    event?.preventDefault?.();
+    const ticket = trackInput.trim();
+    if (!ticket) {
+      showToast('Masukkan nomor tiket aspirasi terlebih dahulu.', 'error');
+      return;
+    }
+    if (!supabase) {
+      showToast('Layanan pelacakan belum terhubung. Silakan coba kembali.', 'error');
+      return;
+    }
+    setIsTracking(true);
+    setTrackedResult(null);
+    try {
+      const { data, error } = await supabase.rpc('track_aspirasi', { p_ticket_number: ticket });
+      if (error) throw error;
+      setTrackedResult(data || null);
+      if (!data) showToast('Nomor tiket tidak ditemukan. Periksa kembali nomor tiket Anda.', 'error');
+    } catch (error) {
+      console.error('Gagal melacak aspirasi:', error);
+      showToast(`Pelacakan aspirasi gagal: ${error.message || 'Silakan coba kembali.'}`, 'error');
+    } finally {
+      setIsTracking(false);
+    }
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1443,7 +1471,7 @@ function PublicAspirasi() {
 
     setIsSubmitting(true);
     const now = new Date();
-    const ticketNumber = `ASP-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const ticketNumber = `ASP-${now.getFullYear()}-${String(Math.floor(10000000 + Math.random() * 90000000))}`;
     const dateStr = getLocalDateString(now);
     const payload = {
       ticket_number: ticketNumber,
@@ -1606,13 +1634,18 @@ function PublicAspirasi() {
             <p className="text-xs text-slate-500">Masukkan nomor tiket untuk melihat progres penanganan oleh sekolah.</p>
           </div>
 
-          <input
-            type="text"
-            value={trackInput}
-            onChange={e => setTrackInput(e.target.value)}
-            placeholder="Masukkan nomor tiket aspirasi"
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <form onSubmit={handleTrackAspirasi} className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={trackInput}
+              onChange={e => { setTrackInput(e.target.value); setTrackedResult(null); }}
+              placeholder="Masukkan nomor tiket aspirasi"
+              className="min-w-0 flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button type="submit" disabled={isTracking} className="px-5 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white text-xs font-semibold">
+              {isTracking ? 'Memeriksa...' : 'Lacak Tiket'}
+            </button>
+          </form>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-slate-400">Contoh tiket:</span>
@@ -1646,12 +1679,12 @@ function PublicAspirasi() {
               <div className="space-y-2 pt-2">
                 <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">Riwayat Progres Penanganan</div>
                 <div className="space-y-2.5 border-l-2 border-blue-500 pl-4 ml-1">
-                  {trackedItem.history.map((h, i) => (
+                  {(trackedItem.history || []).length ? trackedItem.history.map((h, i) => (
                     <div key={i} className="text-xs">
                       <div className="font-semibold text-slate-800">{h.status} <span className="font-normal text-slate-400">({h.date})</span></div>
                       <div className="text-slate-600">{h.note}</div>
                     </div>
-                  ))}
+                  )) : <div className="text-xs text-slate-500">Belum ada pembaruan progres dari pihak sekolah.</div>}
                 </div>
               </div>
             </div>
