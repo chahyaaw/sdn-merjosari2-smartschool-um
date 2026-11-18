@@ -3976,6 +3976,7 @@ function AdminPengumumanModule() {
 function AdminProfileModule() {
   const { currentUser, setCurrentUser, showToast } = useSchool();
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState('');
   const [profileForm, setProfileForm] = useState({
     phone: currentUser.phone || '',
     newPassword: ''
@@ -3996,6 +3997,7 @@ function AdminProfileModule() {
       return;
     }
     setSelectedPhoto(file);
+    readFileAsDataUrl(file, ({ url }) => setPhotoPreview(url));
   };
 
   const handleUpdateProfile = async (e) => {
@@ -4024,6 +4026,7 @@ function AdminProfileModule() {
 
       setCurrentUser({ ...currentUser, phone: profile?.phone || '', photoUrl: profile?.photo_url || '' });
       setSelectedPhoto(null);
+      setPhotoPreview('');
       setProfileForm(prev => ({ ...prev, newPassword: '' }));
       showToast('Profil dan foto akun berhasil diperbarui.');
     } catch (error) {
@@ -4038,7 +4041,7 @@ function AdminProfileModule() {
     <div className="max-w-2xl mx-auto">
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
         <div className="pb-5 border-b border-slate-100 flex items-center gap-4">
-          <UserAvatar user={{ ...currentUser, photoUrl: selectedPhoto ? URL.createObjectURL(selectedPhoto) : currentUser.photoUrl }} size="w-20 h-20 text-xl" />
+          <UserAvatar user={{ ...currentUser, photoUrl: photoPreview || currentUser.photoUrl }} size="w-20 h-20 text-xl" />
           <div>
             <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">Akun Portal Resmi</span>
             <h3 className="font-['Poppins'] font-bold text-xl text-slate-900 mt-2">{currentUser.roleLabel}</h3>
