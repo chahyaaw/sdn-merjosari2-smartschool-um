@@ -1425,6 +1425,7 @@ function PublicAspirasi() {
   const [trackInput, setTrackInput] = useState('');
   const [trackedResult, setTrackedResult] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [hasTracked, setHasTracked] = useState(false);
 
   const trackedItem = trackedResult?.ticketNumber?.toLowerCase() === trackInput.trim().toLowerCase()
     ? trackedResult
@@ -1442,11 +1443,13 @@ function PublicAspirasi() {
       return;
     }
     setIsTracking(true);
+    setHasTracked(false);
     setTrackedResult(null);
     try {
       const { data, error } = await supabase.rpc('track_aspirasi', { p_ticket_number: ticket });
       if (error) throw error;
       setTrackedResult(data || null);
+      setHasTracked(true);
       if (!data) showToast('Nomor tiket tidak ditemukan. Periksa kembali nomor tiket Anda.', 'error');
     } catch (error) {
       console.error('Gagal melacak aspirasi:', error);
@@ -1638,7 +1641,7 @@ function PublicAspirasi() {
             <input
               type="text"
               value={trackInput}
-              onChange={e => { setTrackInput(e.target.value); setTrackedResult(null); }}
+              onChange={e => { setTrackInput(e.target.value); setTrackedResult(null); setHasTracked(false); }}
               placeholder="Masukkan nomor tiket aspirasi"
               className="min-w-0 flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -1690,7 +1693,7 @@ function PublicAspirasi() {
             </div>
           ) : (
             <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 text-slate-400 text-xs">
-              Nomor tiket tidak ditemukan. Pastikan format nomor tiket benar (contoh: ASP-YYYY-0000).
+              {hasTracked ? 'Nomor tiket tidak ditemukan. Pastikan nomor tiket sesuai bukti pengiriman aspirasi Anda.' : 'Masukkan nomor tiket, lalu tekan Lacak Tiket untuk melihat status terbaru.'}
             </div>
           )}
         </div>
