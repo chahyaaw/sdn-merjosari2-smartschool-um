@@ -684,7 +684,33 @@ function SchoolProvider({ children }) {
     };
 
     loadSchoolData();
-    return () => { active = false; };
+
+    // Keep public content and staff dashboard synchronized with database changes.
+    // RLS remains enforced by Supabase; private operational rows are only returned
+    // to authenticated staff sessions that already have permission to read them.
+    const liveChannel = supabase.channel(`school-data-live-${currentUser?.id || 'public'}`);
+    ['agendas', 'documentation', 'announcements'].forEach(table => {
+      liveChannel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+        loadSchoolData();
+      });
+    });
+    if (currentUser?.id) {
+      ['aspirasi', 'aspirasi_history', 'follow_ups'].forEach(table => {
+        liveChannel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+          loadSchoolData();
+        });
+      });
+    }
+    liveChannel.subscribe(status => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.error('Realtime dashboard tidak tersambung:', status);
+      }
+    });
+
+    return () => {
+      active = false;
+      supabase.removeChannel(liveChannel);
+    };
   }, [currentUser?.id]);
 
   const showToast = (message, type = 'success') => {
