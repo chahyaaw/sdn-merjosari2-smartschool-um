@@ -3173,49 +3173,44 @@ function AdminAspirasiModule({ onNavigate }) {
     setSelectedItem(null);
   };
 
-  const createFollowUpFromAspirasi = (item) => {
+  const createFollowUpFromAspirasi = async (item) => {
     const existing = db.followUps.find(f => f.sourceRef === item.ticketNumber);
     if (existing) {
       showToast(`Tiket ini sudah terhubung dengan ${existing.code}. Mengalihkan...`, 'info');
-      onNavigate('tindaklanjut');
-      return;
+      onNavigate('tindaklanjut'); return;
     }
-    const code = `TL-2026-${Math.floor(100 + Math.random() * 899)}`;
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
     const today = new Date().toISOString().slice(0, 10);
+    const timeline = [{ date: today, status: 'Belum Dimulai', note: `Dibuat otomatis dari tiket aspirasi ${item.ticketNumber}.` }];
+    const { data, error } = await supabase.from('follow_ups').insert({
+      title: `Tindak Lanjut: ${item.subject}`, description: item.content,
+      category: 'Aspirasi', responsible_person: 'Kepala Sekolah',
+      priority: item.priority || 'Sedang', target_date: '2026-11-30',
+      status: 'Belum Dimulai', linked_aspirasi_id: item.id, timeline
+    }).select('*').single();
+    if (error) { console.error(error); showToast(`Gagal membuat tindak lanjut: ${error.message}`, 'error'); return; }
+    const update = await supabase.from('aspirasi').update({ status: 'Dalam Tindak Lanjut' }).eq('id', item.id);
+    if (update.error) { console.error(update.error); showToast(`Tindak lanjut tersimpan, tetapi status aspirasi gagal diperbarui: ${update.error.message}`, 'error'); return; }
+    const historyNote = `Dihubungkan ke Tindak Lanjut (TL-${(data.created_at || '').slice(0, 4) || '2026'}-${String(data.id).slice(0, 3).toUpperCase()}).`;
+    const historyResult = await supabase.from('aspirasi_history').insert({ aspirasi_id: item.id, status: 'Dalam Tindak Lanjut', note: historyNote });
+    if (historyResult.error) console.error(historyResult.error);
     const newFu = {
-      id: `fu-${Date.now()}`,
-      code,
-      title: `Tindak Lanjut: ${item.subject}`,
-      sourceType: 'Aspirasi',
-      sourceRef: item.ticketNumber,
-      actionPlan: item.content,
-      pic: 'Kepala Sekolah',
-      priority: item.priority || 'Sedang',
-      deadline: '2026-11-30',
-      status: 'Belum Dimulai',
-      evidenceNote: '',
-      evidenceFileName: '',
-      evidenceFileUrl: '',
-      timeline: [{ date: today, status: 'Belum Dimulai', note: `Dibuat otomatis dari tiket aspirasi ${item.ticketNumber}.` }]
+      id: data.id, code: `TL-${(data.created_at || '').slice(0, 4) || '2026'}-${String(data.id).slice(0, 3).toUpperCase()}`,
+      title: data.title, sourceType: 'Aspirasi', sourceRef: item.ticketNumber,
+      actionPlan: data.description || '', pic: data.responsible_person || '',
+      priority: data.priority || 'Sedang', deadline: data.target_date || '',
+      status: data.status || 'Belum Dimulai', evidenceNote: '', evidenceFileName: '',
+      evidenceFileUrl: '', timeline: data.timeline || timeline
     };
-
     setDb(prev => ({
-      ...prev,
-      followUps: [newFu, ...prev.followUps],
-      aspirasi: prev.aspirasi.map(a =>
-        a.id === item.id
-          ? {
-              ...a,
-              status: 'Dalam Tindak Lanjut',
-              linkedFollowUpId: newFu.id,
-              history: [...a.history, { date: today, status: 'Dalam Tindak Lanjut', note: `Dihubungkan ke Tindak Lanjut (${code}).` }]
-            }
-          : a
-      )
+      ...prev, followUps: [newFu, ...prev.followUps],
+      aspirasi: prev.aspirasi.map(a => a.id === item.id ? {
+        ...a, status: 'Dalam Tindak Lanjut', linkedFollowUpId: data.id,
+        history: [...(a.history || []), { date: today, status: 'Dalam Tindak Lanjut', note: historyNote }]
+      } : a)
     }));
-    showToast(`Berhasil membuat Tindak Lanjut ${code} dari aspirasi!`);
-    setSelectedItem(null);
-    onNavigate('tindaklanjut');
+    showToast('Tindak lanjut berhasil dibuat dan tersimpan ke database!');
+    setSelectedItem(null); onNavigate('tindaklanjut');
   };
 
   return (
