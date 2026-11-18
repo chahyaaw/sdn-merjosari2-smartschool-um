@@ -644,11 +644,12 @@ function SchoolProvider({ children }) {
           updates.followUps = (followUpResult.data || []).map(row => ({
             id: row.id, code: `TL-${(row.created_at || '').slice(0, 4) || '2026'}-${String(row.id).slice(0, 3).toUpperCase()}`,
             title: row.title, sourceType: row.category || 'Umum',
-            sourceRef: row.linked_aspirasi_id || '', actionPlan: row.description || '',
+            sourceRef: (updates.aspirasi || []).find(a => a.id === row.linked_aspirasi_id)?.ticketNumber || '',
+            actionPlan: row.description || '',
             pic: row.responsible_person || '', priority: row.priority || 'Sedang',
             deadline: row.target_date || '', status: row.status || 'Belum Dimulai',
-            evidenceNote: '', evidenceFileName: '', evidenceFileUrl: row.evidence_url || '',
-            timeline: []
+            evidenceNote: row.evidence_note || '', evidenceFileName: row.evidence_file_name || '',
+            evidenceFileUrl: row.evidence_url || '', timeline: row.timeline || []
           }));
         } else {
           console.error('Gagal memuat tindak lanjut petugas:', followUpResult.error.message);
@@ -3151,31 +3152,23 @@ function AdminAspirasiModule({ onNavigate }) {
     });
   };
 
-  const handleSaveStatus = () => {
-    const now = new Date();
-    const stamp = `${now.toISOString().slice(0, 10)} ${now.toTimeString().slice(0, 5)}`;
-
-    setDb(prev => ({
-      ...prev,
-      aspirasi: prev.aspirasi.map(a => {
-        if (a.id !== selectedItem.id) return a;
-        return {
-          ...a,
-          status: editState.status,
-          priority: editState.priority,
-          publicNote: editState.publicNote,
-          internalNote: editState.internalNote,
-          history: [
-            ...a.history,
-            {
-              date: stamp,
-              status: editState.status,
-              note: editState.publicNote || `Status diperbarui menjadi ${editState.status}`
-            }
-          ]
-        };
-      })
-    }));
+  const handleSaveStatus = async () => {
+    if (!supabase || !selectedItem) return;
+    const note = editState.publicNote || `Status diperbarui menjadi ${editState.status}`;
+    const { data, error } = await supabase.from('aspirasi').update({
+      status: editState.status, priority: editState.priority,
+      public_note: editState.publicNote, internal_note: editState.internalNote
+    }).eq('id', selectedItem.id).select('*').single();
+    if (error) { console.error(error); showToast(`Aspirasi gagal diperbarui: ${error.message}`, 'error'); return; }
+    const historyResult = await supabase.from('aspirasi_history').insert({
+      aspirasi_id: selectedItem.id, status: editState.status, note
+    });
+    if (historyResult.error) { console.error(historyResult.error); showToast(`Status tersimpan, tetapi riwayat gagal: ${historyResult.error.message}`, 'error'); }
+    setDb(prev => ({ ...prev, aspirasi: prev.aspirasi.map(a => a.id === selectedItem.id ? {
+      ...a, status: data.status, priority: data.priority, publicNote: data.public_note || '',
+      internalNote: data.internal_note || '',
+      history: [...(a.history || []), { date: new Date().toISOString().slice(0, 16).replace('T', ' '), status: data.status, note }]
+    } : a) }));
     showToast(`Tiket ${selectedItem.ticketNumber} berhasil diperbarui!`);
     setSelectedItem(null);
   };
@@ -3608,19 +3601,40 @@ function AdminFollowUpModule() {
     });
   };
 
-  const createFollowUp = (e) => {
+  const createFollowUp = async (e) => {
     e.preventDefault();
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
     const code = `TL-2026-${Math.floor(100 + Math.random() * 899)}`;
-    const newItem = {
-      id: `fu-${Date.now()}`,
-      code,
-      ...form,
-      sourceType: isGuru ? 'Aspirasi' : form.sourceType,
-      evidenceNote: form.evidenceFileName ? `Lampiran awal: ${form.evidenceFileName}` : '',
-      timeline: [{ date: new Date().toISOString().slice(0, 10), status: form.status, note: 'Rencana tindak lanjut dibuat.' }]
+    const linkedAspirasi = db.aspirasi.find(a => a.ticketNumber === form.sourceRef);
+    const timeline = [{ date: new Date().toISOString().slice(0, 10), status: form.status, note: 'Rencana tindak lanjut dibuat.' }];
+    const payload = {
+      title: form.title, description: form.actionPlan || null,
+      category: isGuru ? 'Aspirasi' : form.sourceType, status: form.status,
+      priority: form.priority, responsible_person: form.pic || null,
+      target_date: form.deadline || null, linked_aspirasi_id: linkedAspirasi?.id || null,
+      evidence_url: form.evidenceFileUrl || null, evidence_note: form.evidenceFileName ? `Lampiran awal: ${form.evidenceFileName}` : '',
+      evidence_file_name: form.evidenceFileName || '', timeline
     };
-    setDb(prev => ({ ...prev, followUps: [newItem, ...prev.followUps] }));
-    showToast(`Tindak lanjut ${code} berhasil dibuat!`);
+    const { data, error } = await supabase.from('follow_ups').insert(payload).select('*').single();
+    if (error) { console.error(error); showToast(`Tindak lanjut gagal disimpan: ${error.message}`, 'error'); return; }
+    if (linkedAspirasi) {
+      const update = await supabase.from('aspirasi').update({ status: 'Dalam Tindak Lanjut' }).eq('id', linkedAspirasi.id);
+      if (update.error) { console.error(update.error); showToast(`Tindak lanjut tersimpan, tetapi status aspirasi gagal diperbarui: ${update.error.message}`, 'error'); }
+      else await supabase.from('aspirasi_history').insert({ aspirasi_id: linkedAspirasi.id, status: 'Dalam Tindak Lanjut', note: `Dihubungkan ke Tindak Lanjut (${code}).` });
+    }
+    const newItem = {
+      id: data.id, code: `TL-${(data.created_at || '').slice(0, 4) || '2026'}-${String(data.id).slice(0, 3).toUpperCase()}`,
+      title: data.title, sourceType: data.category || 'Umum', sourceRef: form.sourceRef,
+      actionPlan: data.description || '', pic: data.responsible_person || '',
+      priority: data.priority || 'Sedang', deadline: data.target_date || '',
+      status: data.status || 'Belum Dimulai', evidenceNote: data.evidence_note || '',
+      evidenceFileName: data.evidence_file_name || '', evidenceFileUrl: data.evidence_url || '', timeline: data.timeline || timeline
+    };
+    setDb(prev => ({
+      ...prev, followUps: [newItem, ...prev.followUps],
+      aspirasi: linkedAspirasi ? prev.aspirasi.map(a => a.id === linkedAspirasi.id ? { ...a, status: 'Dalam Tindak Lanjut' } : a) : prev.aspirasi
+    }));
+    showToast(`Tindak lanjut ${code} berhasil dibuat dan disimpan!`);
     setModalOpen(false);
   };
 
@@ -3635,26 +3649,25 @@ function AdminFollowUpModule() {
     });
   };
 
-  const saveProgress = () => {
+  const saveProgress = async () => {
+    if (!supabase || !detailModal) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
     const today = new Date().toISOString().slice(0, 10);
-    setDb(prev => ({
-      ...prev,
-      followUps: prev.followUps.map(f => {
-        if (f.id !== detailModal.id) return f;
-        return {
-          ...f,
-          status: progressUpdate.status,
-          evidenceNote: progressUpdate.evidenceNote,
-          evidenceFileName: progressUpdate.evidenceFileName,
-          evidenceFileUrl: progressUpdate.evidenceFileUrl,
-          timeline: [
-            ...f.timeline,
-            { date: today, status: progressUpdate.status, note: progressUpdate.note || `Status diperbarui ke ${progressUpdate.status}` }
-          ]
-        };
-      })
-    }));
-    showToast('Progres & bukti tindak lanjut berhasil disimpan!');
+    const timeline = [...(detailModal.timeline || []), {
+      date: today, status: progressUpdate.status,
+      note: progressUpdate.note || `Status diperbarui ke ${progressUpdate.status}`
+    }];
+    const { data, error } = await supabase.from('follow_ups').update({
+      status: progressUpdate.status, evidence_note: progressUpdate.evidenceNote || '',
+      evidence_file_name: progressUpdate.evidenceFileName || '',
+      evidence_url: progressUpdate.evidenceFileUrl || null, timeline
+    }).eq('id', detailModal.id).select('*').single();
+    if (error) { console.error(error); showToast(`Progres gagal disimpan: ${error.message}`, 'error'); return; }
+    setDb(prev => ({ ...prev, followUps: prev.followUps.map(f => f.id === detailModal.id ? {
+      ...f, status: data.status, evidenceNote: data.evidence_note || '',
+      evidenceFileName: data.evidence_file_name || '', evidenceFileUrl: data.evidence_url || '',
+      timeline: data.timeline || timeline
+    } : f) }));
+    showToast('Progres & bukti tindak lanjut berhasil disimpan ke database!');
     setDetailModal(null);
   };
 
