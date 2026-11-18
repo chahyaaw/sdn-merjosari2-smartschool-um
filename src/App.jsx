@@ -550,6 +550,142 @@ function SchoolProvider({ children }) {
     return () => { active = false; supabase.removeChannel(channel); };
   }, [currentUser?.id]);
 
+  // Load school content from Supabase. Public visitors only receive published/public rows;
+  // staff sessions additionally receive operational records protected by RLS.
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+
+    const loadSchoolData = async () => {
+      const publicQueries = await Promise.all([
+        supabase.from('agendas').select('*').eq('status', 'Disetujui').order('event_date', { ascending: true }),
+        supabase.from('documentation').select('*').eq('status', 'Terbit').order('event_date', { ascending: false }),
+        supabase.from('announcements').select('*').eq('visibility', 'Publik').order('announcement_date', { ascending: false })
+      ]);
+      if (!active) return;
+
+      const [agendaResult, documentationResult, announcementResult] = publicQueries;
+      const updates = {};
+
+      if (!agendaResult.error) {
+        updates.agendas = (agendaResult.data || []).map(row => ({
+          id: row.id, title: row.title, date: row.event_date || '',
+          startTime: String(row.start_time || '').slice(0, 5),
+          endTime: String(row.end_time || '').slice(0, 5),
+          location: row.location || '', category: row.category || 'Lainnya',
+          color: 'blue', description: row.description || '',
+          status: row.status || 'Disetujui',
+          submitterId: row.submitted_by || '',
+          submittedBy: row.submitted_by && currentUser?.id === row.submitted_by ? currentUser.roleLabel : 'Petugas',
+          revisionNote: '', attachment: ''
+        }));
+      } else {
+        console.error('Gagal memuat kalender publik:', agendaResult.error.message);
+      }
+
+      if (!documentationResult.error) {
+        updates.dokumentasi = (documentationResult.data || []).map(row => ({
+          id: row.id, title: row.title, category: row.category || 'Akademik',
+          date: row.event_date || '', year: (row.event_date || '').slice(0, 4),
+          status: row.status || 'Terbit', mediaType: row.media_type || 'Foto',
+          fileName: row.file_name || '', fileUrl: row.file_url || '',
+          description: row.description || ''
+        }));
+      } else {
+        console.error('Gagal memuat dokumentasi publik:', documentationResult.error.message);
+      }
+
+      if (!announcementResult.error) {
+        updates.pengumuman = (announcementResult.data || []).map(row => ({
+          id: row.id, title: row.title, date: row.announcement_date || '',
+          category: row.category || 'Pengumuman Sekolah',
+          visibility: row.visibility || 'Publik',
+          photoUrl: row.photo_url || '', photoName: row.photo_name || '',
+          content: row.content || ''
+        }));
+      } else {
+        console.error('Gagal memuat pengumuman publik:', announcementResult.error.message);
+      }
+
+      if (currentUser?.id) {
+        const [aspirasiResult, historyResult, followUpResult, allAgendaResult, allDocumentationResult, allAnnouncementResult] = await Promise.all([
+          supabase.from('aspirasi').select('*').order('created_at', { ascending: false }),
+          supabase.from('aspirasi_history').select('*').order('created_at', { ascending: true }),
+          supabase.from('follow_ups').select('*').order('created_at', { ascending: false }),
+          supabase.from('agendas').select('*').order('event_date', { ascending: true }),
+          supabase.from('documentation').select('*').order('event_date', { ascending: false }),
+          supabase.from('announcements').select('*').order('announcement_date', { ascending: false })
+        ]);
+        if (!active) return;
+
+        if (!aspirasiResult.error && !historyResult.error) {
+          const historyByAspirasi = (historyResult.data || []).reduce((groups, item) => {
+            (groups[item.aspirasi_id] ||= []).push({
+              date: item.created_at ? item.created_at.replace('T', ' ').slice(0, 16) : '',
+              status: item.status, note: item.note || ''
+            });
+            return groups;
+          }, {});
+          updates.aspirasi = (aspirasiResult.data || []).map(row => ({
+            id: row.id, ticketNumber: row.ticket_number,
+            senderName: row.sender_name || 'Anonim', contact: row.contact || '-',
+            category: row.category || 'Lainnya', subject: row.subject, content: row.content,
+            attachment: row.attachment_url || '', status: row.status || 'Baru Masuk',
+            priority: row.priority || 'Sedang',
+            createdAt: (row.created_at || '').slice(0, 10),
+            publicNote: row.public_note || '', internalNote: row.internal_note || '',
+            linkedFollowUpId: null, history: historyByAspirasi[row.id] || []
+          }));
+        } else {
+          console.error('Gagal memuat aspirasi petugas:', aspirasiResult.error?.message || historyResult.error?.message);
+        }
+
+        if (!followUpResult.error) {
+          updates.followUps = (followUpResult.data || []).map(row => ({
+            id: row.id, code: `TL-${(row.created_at || '').slice(0, 4) || '2026'}-${String(row.id).slice(0, 3).toUpperCase()}`,
+            title: row.title, sourceType: row.category || 'Umum',
+            sourceRef: row.linked_aspirasi_id || '', actionPlan: row.description || '',
+            pic: row.responsible_person || '', priority: row.priority || 'Sedang',
+            deadline: row.target_date || '', status: row.status || 'Belum Dimulai',
+            evidenceNote: '', evidenceFileName: '', evidenceFileUrl: row.evidence_url || '',
+            timeline: []
+          }));
+        } else {
+          console.error('Gagal memuat tindak lanjut petugas:', followUpResult.error.message);
+        }
+
+        if (!allAgendaResult.error) updates.agendas = (allAgendaResult.data || []).map(row => ({
+          id: row.id, title: row.title, date: row.event_date || '',
+          startTime: String(row.start_time || '').slice(0, 5),
+          endTime: String(row.end_time || '').slice(0, 5),
+          location: row.location || '', category: row.category || 'Lainnya',
+          color: 'blue', description: row.description || '', status: row.status || '',
+          submitterId: row.submitted_by || '',
+          submittedBy: row.submitted_by && currentUser?.id === row.submitted_by ? currentUser.roleLabel : 'Petugas',
+          revisionNote: '', attachment: ''
+        }));
+        if (!allDocumentationResult.error) updates.dokumentasi = (allDocumentationResult.data || []).map(row => ({
+          id: row.id, title: row.title, category: row.category || 'Akademik',
+          date: row.event_date || '', year: (row.event_date || '').slice(0, 4),
+          status: row.status || 'Draft', mediaType: row.media_type || 'Foto',
+          fileName: row.file_name || '', fileUrl: row.file_url || '', description: row.description || ''
+        }));
+        if (!allAnnouncementResult.error) updates.pengumuman = (allAnnouncementResult.data || []).map(row => ({
+          id: row.id, title: row.title, date: row.announcement_date || '',
+          category: row.category || 'Pengumuman Sekolah', visibility: row.visibility || 'Publik',
+          photoUrl: row.photo_url || '', photoName: row.photo_name || '', content: row.content || ''
+        }));
+      }
+
+      if (active && Object.keys(updates).length) {
+        setDb(prev => ({ ...prev, ...updates }));
+      }
+    };
+
+    loadSchoolData();
+    return () => { active = false; };
+  }, [currentUser?.id]);
+
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3800);
