@@ -1,3 +1,69 @@
+import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
+import { supabase } from './lib/supabase';
+import {
+  MapPin, Phone, Mail, Building, Sparkles,
+  ClipboardList, UserCheck, History, Send, RefreshCw, ExternalLink,
+  AlertTriangle, LayoutDashboard, Menu, X,
+  Upload, Lock, User, Image as ImageIcon, Link2, Newspaper,
+  Shield, CheckCircle, LogIn, School, MessageSquare, Calendar as CalendarIcon,
+  ChevronRight, Printer, Search, Eye, Download, Users, LogOut, Bell,
+  Plus, Edit, Trash2
+} from 'lucide-react';
+import {
+  AreaChart, Area, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from 'recharts';
+
+// ============================================================================
+// 1. INITIAL REALISTIC SEED DATA & CONSTANTS (SDN MERJOSARI 2 - MALANG)
+// ============================================================================
+
+const STORAGE_KEY = 'sdn_merjosari_2_sim_v2';
+
+const SCHOOL_INFO = {
+  name: 'SDN Merjosari 2',
+  npsn: '20534039',
+  address: 'Jl. Joyo Utomo I, Kec. Lowokwaru, Kota Malang, Prov. Jawa Timur',
+  phone: '(0341) 554020',
+  email: 'sdnmerjo_sari02@gmail.com',
+  visi: 'Peserta Didik Cerdas, Terampil dan Berkepribadian Baik Yang Dilandasi IMTAQ.',
+  misi: 'Melaksanakan Pembelajaran Secara Efektif Agar Siswa Berkembang Optimal Sesuai Dengan Potensi Yang Dimiliki.',
+  mapsEmbedUrl: 'https://maps.google.com/maps?q=Jl.%20Joyo%20Utomo%20I,%20Lowokwaru,%20Kota%20Malang,%20Jawa%20Timur&t=&z=16&ie=UTF8&iwloc=&output=embed',
+  mapsExternalUrl: 'https://www.google.com/maps/search/?api=1&query=Jl.+Joyo+Utomo+I,+Kec.+Lowokwaru,+Kota+Malang,+Prov.+Jawa+Timur'
+};
+
+const INITIAL_USERS = [
+  {
+    id: 'usr-kepsek',
+    username: 'kepsek',
+    password: '123',
+    role: 'kepala_sekolah',
+    roleLabel: 'Kepala Sekolah',
+    phone: '(0341) 554020',
+    email: 'sdnmerjo_sari02@gmail.com',
+    avatar: 'KS',
+    photoUrl: ''
+  },
+  {
+    id: 'usr-guru',
+    username: 'guru',
+    password: '123',
+    role: 'guru',
+    roleLabel: 'Guru',
+    phone: '(0341) 554020',
+    email: 'sdnmerjo_sari02@gmail.com',
+    avatar: 'GR',
+    photoUrl: ''
+  }
+];
+
+const INITIAL_GUESTBOOK = [
+  {
+    id: 'gb-1',
+    regNumber: 'GT-2026-1041',
+    name: 'Drs. Hendra Gunawan',
+    institution: 'Dinas Pendidikan Kota Malang',
+    phone: '0812-3300-1188',
     purpose: 'Kunjungan Dinas',
     destination: 'Bertemu Kepala Sekolah terkait monitoring ANBK',
     notes: 'Monitoring kesiapan Asesmen Nasional Berbasis Komputer (ANBK)',
@@ -87,7 +153,7 @@ const INITIAL_ASPIRASI = [
     status: 'Selesai',
     priority: 'Sedang',
     createdAt: '2026-11-05',
-      publicNote: 'Keran wastafel telah diganti dengan unit baru oleh petugas kebersihan & sarpras pada 6 November 2026.',
+    publicNote: 'Keran wastafel telah diganti dengan unit baru oleh petugas kebersihan & sarpras pada 6 November 2026.',
     internalNote: 'Selesai diganti, sudah dicek berfungsi normal.',
     linkedFollowUpId: null,
     history: [
@@ -111,7 +177,7 @@ const INITIAL_DOKUMENTASI = [
     description: 'Seluruh siswa kelas I hingga VI mengikuti upacara bendera dengan khidmat dilanjutkan parade busana pahlawan nasional untuk menanamkan nilai patriotisme sejak dini.'
   },
   {
-      id: 'dok-2',
+    id: 'dok-2',
     title: 'Workshop Implementasi Pembelajaran Interaktif Berbasis TIK',
     category: 'Akademik',
     date: '2026-10-24',
@@ -148,7 +214,7 @@ const INITIAL_PENGUMUMAN = [
     content: 'SDN Merjosari 2 telah menerima 250 eksemplar buku bacaan literasi anak hasil kolaborasi program Gerakan Literasi Sekolah Kota Malang. Seluruh buku telah dicatat pada katalog perpustakaan dan mulai dapat dipinjam oleh seluruh siswa kelas I sampai VI pada jam istirahat maupun jam kunjung literasi.'
   },
   {
-      id: 'pg-2',
+    id: 'pg-2',
     title: 'Jadwal Pelaksanaan Sumatif Akhir Semester (SAS) Ganjil Tahun Ajaran 2026/2027',
     date: '2026-11-12',
     category: 'Informasi Akademik',
@@ -205,7 +271,24 @@ const INITIAL_AGENDAS = [
     attachment: 'proposal_outing_kelas5.pdf'
   },
   {
-          title: 'Sumatif Akhir Semester (SAS) Ganjil 2026/2027',
+    id: 'ag-3',
+    title: 'Lomba Cerdas Cermat Antar Kelas (Class Meeting)',
+    date: '2026-12-10',
+    startTime: '08:00',
+    endTime: '12:00',
+    location: 'Aula & Lapangan Utama',
+    category: 'Kesiswaan',
+    color: 'amber',
+    description: 'Kegiatan pasca ujian untuk mengasah sportivitas, literasi, dan kerja sama tim siswa.',
+    status: 'Menunggu Persetujuan',
+    submittedBy: 'Guru',
+    submitterId: 'usr-guru',
+    revisionNote: '',
+    attachment: 'juknis_lomba_desember.pdf'
+  },
+  {
+    id: 'ag-4',
+    title: 'Sumatif Akhir Semester (SAS) Ganjil 2026/2027',
     date: '2026-12-01',
     startTime: '07:30',
     endTime: '11:00',
@@ -261,6 +344,14 @@ const INITIAL_FOLLOWUPS = [
     ]
   }
 ];
+
+// ============================================================================
+// 2. FILE UPLOAD HELPER (CONVERT FILE TO DATAURL FOR PERSISTENT PREVIEW)
+// ============================================================================
+
+function readFileAsDataUrl(file, callback) {
+  if (!file) return;
+  const reader = new FileReader();
   reader.onload = (e) => {
     callback({
       name: file.name,
@@ -392,48 +483,10 @@ function SchoolProvider({ children }) {
     }
   }, [db]);
 
-  // Restore authenticated staff session from Supabase and resolve the trusted role.
-  useEffect(() => {
-    if (!supabase) return;
-    let active = true;
-
-    const loadStaffProfile = async (authUser) => {
-      if (!authUser) {
-        if (active) {
-          setCurrentUser(null);
-          setViewMode('public');
-        }
-        return;
-      }
-
-      const { data: profile, error } = await supabase
-        .from('staff_profiles')
-        .select('role, display_name, phone')
-        .eq('id', authUser.id)
-        .single();
-
-      if (!active) return;
-      if (error || !profile || !['kepala_sekolah', 'guru'].includes(profile.role)) {
-        console.error('Profil petugas tidak ditemukan/valid:', error);
-        setCurrentUser(null);
-        setViewMode('public');
-        return;
-      }
-
-      const roleLabel = profile.role === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru';
-      setCurrentUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        role: profile.role,
-        roleLabel,
-        name: profile.display_name || roleLabel,
-        phone: profile.phone || '',
-        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR',
-        photoUrl: ''
-      });
-      setViewMode('admin');
-    };
-        };
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3800);
+  };
 
   const addNotification = (title, message, targetTab = 'dashboard') => {
     setDb(prev => ({
@@ -522,79 +575,65 @@ function PriorityBadge({ priority }) {
   );
 }
 
+function UserAvatar({ user, size = 'w-10 h-10 text-sm' }) {
+  if (user?.photoUrl) {
+    return (
+      <img
+        src={user.photoUrl}
+        alt={user.roleLabel}
+        className={`${size} rounded-full object-cover border border-slate-200 shrink-0`}
+      />
+    );
+  }
+  return (
+    <div className={`${size} rounded-full bg-blue-700 text-white font-bold flex items-center justify-center shrink-0`}>
+      {user?.avatar || 'SD'}
+    </div>
+  );
+}
+
+function Modal({ open, onClose, title, maxWidth = 'max-w-2xl', children }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div className={`bg-white rounded-2xl shadow-2xl border border-slate-200 w-full ${maxWidth} max-h-[90vh] flex flex-col overflow-hidden`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+          <h3 className="text-lg font-bold text-slate-800 font-['Poppins']">{title}</h3>
+          <button onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 overflow-y-auto space-y-4">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 6. LOGIN PORTAL MODAL (HANYA KEPALA SEKOLAH & GURU DENGAN PASSWORD)
+// ============================================================================
+
 function LoginModal({ open, onClose }) {
-  const { setCurrentUser, setViewMode, showToast } = useSchool();
+  const { db, setCurrentUser, setViewMode, showToast } = useSchool();
   const [selectedRole, setSelectedRole] = useState('kepala_sekolah');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const roleLabel = selectedRole === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru';
-
-  const handleLogin = async (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
+    const found = db.users.find(u => u.role === selectedRole && u.password === password);
+    if (!found) {
+      setError('Kata sandi tidak sesuai. Silakan periksa kembali kata sandi peran Anda.');
+      return;
+    }
+    setCurrentUser(found);
+    setViewMode('admin');
     setError('');
-    if (!supabase) {
-      setError('Koneksi Supabase belum tersedia. Periksa konfigurasi website.');
-      return;
-    }
-    if (!email.trim() || !password) {
-      setError('Email dan kata sandi wajib diisi.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password
-      });
-
-      if (authError || !authData?.user) {
-        setError('Email atau kata sandi tidak sesuai. Periksa kembali akun Anda.');
-        return;
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from('staff_profiles')
-        .select('role, display_name, phone')
-        .eq('id', authData.user.id)
-        .single();
-
-      if (profileError || !profile || !['kepala_sekolah', 'guru'].includes(profile.role)) {
-        await supabase.auth.signOut();
-        setError('Akun berhasil dikenali, tetapi peran petugas belum terdaftar. Hubungi administrator sekolah.');
-        return;
-      }
-
-      if (profile.role !== selectedRole) {
-        await supabase.auth.signOut();
-        setError(`Akun ini terdaftar sebagai ${profile.role === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru'}. Silakan pilih peran yang sesuai.`);
-        return;
-      }
-
-      const userRoleLabel = profile.role === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru';
-      setCurrentUser({
-        id: authData.user.id,
-        email: authData.user.email || email.trim(),
-        role: profile.role,
-        roleLabel: userRoleLabel,
-        name: profile.display_name || userRoleLabel,
-        phone: profile.phone || '',
-        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR',
-        photoUrl: ''
-      });
-      setViewMode('admin');
-      setPassword('');
-      showToast(`Berhasil masuk ke Portal ${userRoleLabel}!`);
-      onClose();
-    } catch (err) {
-      console.error('Kesalahan login:', err);
-      setError('Terjadi kendala saat menghubungi server. Silakan coba lagi.');
-    } finally {
-      setLoading(false);
-    }
+    setPassword('');
+    showToast(`Berhasil masuk ke Portal ${found.roleLabel}!`);
+    onClose();
   };
 
   return (
@@ -603,19 +642,51 @@ function LoginModal({ open, onClose }) {
         <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-100 flex items-start gap-3">
           <Shield className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
           <div className="text-xs text-blue-900 leading-relaxed">
-            Masuk menggunakan email dan kata sandi akun Supabase. Hak akses akan diperiksa berdasarkan peran petugas yang terdaftar.
+            Pilih peran akses (<strong>Kepala Sekolah</strong> atau <strong>Guru</strong>) dan masukkan kata sandi masing-masing untuk masuk ke sistem.
           </div>
         </div>
-                      </div>
+
+        {/* Role Selector Cards (No Personal Names) */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pilih Peran Akses</label>
+          <div className="grid grid-cols-2 gap-3">
+            {db.users.map(u => {
+              const isSelected = selectedRole === u.role;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => { setSelectedRole(u.role); setError(''); }}
+                  className={`p-3.5 rounded-2xl border-2 transition text-left flex flex-col gap-2 ${
+                    isSelected
+                      ? 'border-blue-700 bg-blue-50/70 shadow-xs'
+                      : 'border-slate-200 hover:border-blue-300 bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <UserAvatar user={u} size="w-9 h-9 text-xs" />
+                    {isSelected && <CheckCircle className="w-4 h-4 text-blue-700" />}
+                  </div>
+                  <div>
+                    <div className="font-['Poppins'] font-bold text-sm text-slate-900">{u.roleLabel}</div>
+                    <div className="text-[11px] text-slate-500">Sandi default: <span className="font-mono font-semibold text-blue-700">{u.password}</span></div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-4 pt-3 border-t border-slate-100">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Kata Sandi {roleLabel}</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Kata Sandi ({selectedRole === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru'})
+            </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
               <input
                 type="password"
                 required
-                autoComplete="current-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -628,10 +699,9 @@ function LoginModal({ open, onClose }) {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-2.5 px-4 rounded-xl bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold text-sm shadow-md shadow-blue-700/20 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm shadow-md shadow-blue-700/20 transition flex items-center justify-center gap-2"
           >
-            <LogIn className="w-4 h-4" /> {loading ? 'Memeriksa akun...' : `Masuk sebagai ${roleLabel}`}
+            <LogIn className="w-4 h-4" /> Masuk sebagai {selectedRole === 'kepala_sekolah' ? 'Kepala Sekolah' : 'Guru'}
           </button>
         </form>
       </div>
@@ -698,7 +768,107 @@ function PublicPortal({ onOpenLogin }) {
                 </div>
               </div>
             </button>
-              
+
+            <nav className="hidden lg:flex items-center gap-1">
+              {navItems.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => navigate(item.id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                    activeTab === item.id
+                      ? 'bg-blue-50 text-blue-700 font-semibold'
+                      : 'text-slate-600 hover:text-blue-700 hover:bg-slate-100/70'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-2">
+              {currentUser ? (
+                <button
+                  onClick={() => setViewMode('admin')}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition flex items-center gap-2"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Portal {currentUser.roleLabel}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={onOpenLogin}
+                  className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs sm:text-sm font-semibold shadow-md shadow-blue-700/15 transition flex items-center gap-2"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Login Petugas</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+              >
+                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-1 shadow-lg">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.id)}
+                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium ${
+                  activeTab === item.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </header>
+
+      <main className="flex-1">
+        {activeTab === 'beranda' && <PublicHome onNavigate={navigate} />}
+        {activeTab === 'profil' && <PublicSchoolProfile />}
+        {activeTab === 'bukutamu' && <PublicGuestbook />}
+        {activeTab === 'dokumentasi' && <PublicDocumentation />}
+        {activeTab === 'aspirasi' && <PublicAspirasi />}
+        {activeTab === 'pengumuman' && <PublicPengumuman />}
+        {activeTab === 'kalender' && <PublicCalendar />}
+      </main>
+
+      {/* Institutional Footer */}
+      <footer className="bg-slate-900 text-slate-300 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                <School className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-['Poppins'] font-bold text-white text-lg block leading-tight">{SCHOOL_INFO.name}</span>
+                <span className="text-xs text-sky-400">NPSN: {SCHOOL_INFO.npsn}</span>
+              </div>
+            </div>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              {SCHOOL_INFO.visi}
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-['Poppins'] font-semibold text-white mb-4">Layanan Publik Digital</h4>
+            <ul className="space-y-2 text-sm">
+              <li><button onClick={() => navigate('bukutamu')} className="hover:text-sky-400 transition">Buku Tamu Digital</button></li>
+              <li><button onClick={() => navigate('aspirasi')} className="hover:text-sky-400 transition">Layanan Aspirasi & Pengaduan</button></li>
+              <li><button onClick={() => navigate('pengumuman')} className="hover:text-sky-400 transition">Pengumuman & Berita Sekolah</button></li>
+              <li><button onClick={() => navigate('kalender')} className="hover:text-sky-400 transition">Kalender Akademik Resmi</button></li>
+            </ul>
+          </div>
+
           <div>
             <h4 className="font-['Poppins'] font-semibold text-white mb-4">Jam Layanan Sekolah</h4>
             <ul className="space-y-2 text-sm text-slate-400">
@@ -796,7 +966,69 @@ function PublicHome({ onNavigate }) {
           </div>
         </div>
       </section>
-                            <span className="text-xs font-medium opacity-90">{doc.date}</span>
+
+      {/* Latest News / Announcements & Documentation Highlights */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Pengumuman & Berita Terbaru */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-['Poppins'] text-xl font-bold text-slate-900">Pengumuman & Berita Terbaru</h2>
+              <p className="text-xs text-slate-500">Informasi dan kabar kegiatan terkini dari {SCHOOL_INFO.name}</p>
+            </div>
+            <button onClick={() => onNavigate('pengumuman')} className="text-sm font-semibold text-blue-700 hover:underline flex items-center gap-1">
+              Semua Berita <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {publicNews.slice(0, 3).map(news => (
+              <div
+                key={news.id}
+                onClick={() => onNavigate('pengumuman')}
+                className="cursor-pointer bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition flex items-start gap-4"
+              >
+                {news.photoUrl ? (
+                  <img src={news.photoUrl} alt={news.title} className="w-20 h-20 rounded-xl object-cover shrink-0 border border-slate-100" />
+                ) : (
+                  <div className="w-20 h-20 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                    <Newspaper className="w-8 h-8" />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700">{news.category}</span>
+                    <span className="text-xs text-slate-400">{news.date}</span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{news.title}</h4>
+                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{news.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Dokumentasi Kegiatan Terbaru */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-['Poppins'] text-xl font-bold text-slate-900">Dokumentasi Kegiatan</h2>
+              <p className="text-xs text-slate-500">Galeri foto & video aktivitas sekolah</p>
+            </div>
+            <button onClick={() => onNavigate('dokumentasi')} className="text-sm font-semibold text-blue-700 hover:underline flex items-center gap-1">
+              Semua Galeri <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {publishedDocs.slice(0, 2).map(doc => (
+              <div key={doc.id} onClick={() => onNavigate('dokumentasi')} className="cursor-pointer bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs hover:shadow-md transition group">
+                {doc.fileUrl && doc.mediaType === 'Foto' ? (
+                  <img src={doc.fileUrl} alt={doc.title} className="w-full h-32 object-cover" />
+                ) : (
+                  <div className="h-24 bg-gradient-to-r from-blue-700 to-sky-500 p-4 flex items-end justify-between text-white">
+                    <span className="px-2.5 py-1 rounded-lg bg-black/25 backdrop-blur-xs text-xs font-medium">{doc.category}</span>
+                    <span className="text-xs font-medium opacity-90">{doc.date}</span>
                   </div>
                 )}
                 <div className="p-4">
@@ -882,6 +1114,144 @@ function PublicSchoolProfile() {
           </div>
         </div>
       )}
+
+      {subTab === 'visimisi' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gradient-to-br from-blue-700 to-blue-900 text-white rounded-2xl p-7 space-y-4">
+            <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">VISI SEKOLAH</span>
+            <h3 className="font-['Poppins'] text-xl font-bold leading-snug">
+              "{SCHOOL_INFO.visi}"
+            </h3>
+          </div>
+          <div className="bg-white rounded-2xl p-7 border border-slate-200 space-y-4">
+            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">MISI SEKOLAH</span>
+            <p className="text-base font-medium text-slate-800 leading-relaxed">
+              {SCHOOL_INFO.misi}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Embedded Interactive Google Maps */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-['Poppins'] font-bold text-lg text-slate-900 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-rose-600" /> Peta Lokasi {SCHOOL_INFO.name}
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">{SCHOOL_INFO.address}</p>
+          </div>
+          <a
+            href={SCHOOL_INFO.mapsExternalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold inline-flex items-center gap-1.5 self-start"
+          >
+            <ExternalLink className="w-4 h-4" /> Buka di Google Maps
+          </a>
+        </div>
+        <div className="w-full h-80 sm:h-96 rounded-2xl overflow-hidden border border-slate-200">
+          <iframe
+            title="Peta Lokasi SDN Merjosari 2"
+            src={SCHOOL_INFO.mapsEmbedUrl}
+            className="w-full h-full border-0"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- 7C. PUBLIC DIGITAL GUESTBOOK (TUJUAN KUNJUNGAN SEBAGAI INPUT ISIAN) ---
+function PublicGuestbook() {
+  const { setDb, showToast, addNotification } = useSchool();
+  const [form, setForm] = useState({
+    name: '',
+    institution: '',
+    phone: '',
+    purpose: 'Kunjungan Dinas',
+    destination: '',
+    notes: ''
+  });
+  const [receipt, setReceipt] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!form.name.trim() || !form.institution.trim() || !form.phone.trim() || !form.destination.trim()) {
+      showToast('Mohon lengkapi Nama, Instansi, Nomor HP, dan Tujuan Kunjungan!', 'error');
+      return;
+    }
+
+    if (!supabase) {
+      showToast('Koneksi database belum tersedia. Silakan coba kembali.', 'error');
+      return;
+    }
+
+    const now = new Date();
+    const pad = (value) => String(value).padStart(2, '0');
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const regNumber = `GT-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    try {
+      const { error } = await supabase.from('guestbook').insert({
+        reg_number: regNumber,
+        name: form.name.trim(),
+        institution: form.institution.trim(),
+        phone: form.phone.trim(),
+        purpose: form.purpose,
+        destination: form.destination.trim(),
+        notes: form.notes.trim(),
+        visit_date: dateStr,
+        visit_time: timeStr,
+        verified: false
+      });
+
+      if (error) {
+        console.error('Gagal menyimpan buku tamu ke Supabase:', error);
+        showToast('Data belum berhasil disimpan. Silakan coba kembali.', 'error');
+        return;
+      }
+
+      const newEntry = {
+        id: `gb-${Date.now()}`,
+        regNumber,
+        ...form,
+        date: dateStr,
+        time: timeStr,
+        verified: false
+      };
+
+      setDb(prev => ({ ...prev, guestbook: [newEntry, ...(prev.guestbook || [])] }));
+      addNotification('Buku Tamu Digital Baru', `${form.name} (${form.institution}) - ${form.destination}`, 'bukutamu');
+      setReceipt(newEntry);
+      showToast('Registrasi Buku Tamu berhasil tersimpan ke database!');
+      setForm({ name: '', institution: '', phone: '', purpose: 'Kunjungan Dinas', destination: '', notes: '' });
+    } catch (err) {
+      console.error('Kesalahan saat mengirim buku tamu:', err);
+      showToast('Terjadi kesalahan saat menghubungi database.', 'error');
+    }
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <div className="text-center max-w-2xl mx-auto space-y-2">
+        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">Pelayanan Resepsionis Digital</span>
+        <h1 className="font-['Poppins'] text-2xl sm:text-3xl font-bold text-slate-900">Buku Tamu Digital {SCHOOL_INFO.name}</h1>
+        <p className="text-sm text-slate-500">
+          Silakan isi formulir kunjungan di bawah ini. Data Anda otomatis tercatat pada sistem administrasi dan mendapatkan nomor registrasi kunjungan.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <form onSubmit={handleSubmit} className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Lengkap Pengunjung *</label>
+              <input
                 type="text"
                 required
                 value={form.name}
@@ -961,6 +1331,119 @@ function PublicSchoolProfile() {
             <CheckCircle className="w-4 h-4" /> Simpan & Dapatkan Nomor Kunjungan
           </button>
         </form>
+
+        {/* Visitor Pass / Status Card */}
+        <div className="lg:col-span-5 space-y-4">
+          {receipt ? (
+            <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-white/20 pb-3">
+                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-100">Kartu Registrasi Tamu</span>
+                <CheckCircle className="w-6 h-6 text-emerald-200" />
+              </div>
+              <div>
+                <div className="text-xs text-emerald-100">Nomor Registrasi</div>
+                <div className="font-['Poppins'] text-2xl font-bold tracking-wide">{receipt.regNumber}</div>
+              </div>
+              <div className="bg-white/10 rounded-2xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-emerald-100">Nama:</span><span className="font-semibold">{receipt.name}</span></div>
+                <div className="flex justify-between"><span className="text-emerald-100">Instansi:</span><span className="font-semibold">{receipt.institution}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-emerald-100 shrink-0">Tujuan:</span><span className="font-semibold text-right">{receipt.destination}</span></div>
+                <div className="flex justify-between"><span className="text-emerald-100">Waktu:</span><span className="font-semibold">{receipt.date} • {receipt.time} WIB</span></div>
+              </div>
+              <button
+                onClick={() => window.print()}
+                className="w-full py-2.5 rounded-xl bg-white text-emerald-800 font-semibold text-xs hover:bg-emerald-50 transition flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> Cetak Bukti Kunjungan
+              </button>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-100 rounded-3xl p-6 space-y-3">
+              <h3 className="font-['Poppins'] font-bold text-blue-950 text-base">Tata Tertib Kunjungan Sekolah</h3>
+              <ul className="text-xs text-blue-900/80 space-y-2 list-disc pl-4 leading-relaxed">
+                <li>Pengunjung wajib mengisi buku tamu digital sebelum memasuki area ruang guru atau kelas.</li>
+                <li>Gunakan pakaian yang sopan dan rapi selama berada di lingkungan {SCHOOL_INFO.name}.</li>
+                <li>Nomor registrasi otomatis tersinkronisasi dengan dashboard Kepala Sekolah dan Guru.</li>
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- 7D. PUBLIC DOCUMENTATION GALLERY ---
+function PublicDocumentation() {
+  const { db } = useSchool();
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('Semua');
+  const [year, setYear] = useState('Semua');
+  const [selectedDoc, setSelectedDoc] = useState(null);
+
+  const publishedDocs = db.dokumentasi.filter(d => d.status === 'Terbit');
+  const categories = ['Semua', ...new Set(publishedDocs.map(d => d.category))];
+  const years = ['Semua', ...new Set(publishedDocs.map(d => d.year))];
+
+  const filtered = publishedDocs.filter(d => {
+    const matchSearch = d.title.toLowerCase().includes(search.toLowerCase()) || d.description.toLowerCase().includes(search.toLowerCase());
+    const matchCat = category === 'Semua' || d.category === category;
+    const matchYear = year === 'Semua' || d.year === year;
+    return matchSearch && matchCat && matchYear;
+  });
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <div>
+        <span className="px-3 py-1 rounded-full bg-sky-100 text-sky-800 text-xs font-semibold">Galeri & Arsip Publik</span>
+        <h1 className="font-['Poppins'] text-2xl sm:text-3xl font-bold text-slate-900 mt-2">Dokumentasi Kegiatan Sekolah</h1>
+        <p className="text-sm text-slate-500">Liputan foto dan video kegiatan yang telah diterbitkan oleh {SCHOOL_INFO.name}.</p>
+      </div>
+
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cari judul atau deskripsi kegiatan..."
+            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
+        <select value={category} onChange={e => setCategory(e.target.value)} className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm bg-white outline-none">
+          {categories.map(c => <option key={c} value={c}>Kategori: {c}</option>)}
+        </select>
+        <select value={year} onChange={e => setYear(e.target.value)} className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm bg-white outline-none">
+          {years.map(y => <option key={y} value={y}>Tahun: {y}</option>)}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map(doc => (
+          <div
+            key={doc.id}
+            onClick={() => setSelectedDoc(doc)}
+            className="cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-lg transition group flex flex-col"
+          >
+            {doc.fileUrl && doc.mediaType === 'Foto' ? (
+              <div className="h-44 relative overflow-hidden">
+                <img src={doc.fileUrl} alt={doc.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 text-white text-xs font-semibold">{doc.category}</span>
+              </div>
+            ) : (
+              <div className="h-44 bg-gradient-to-br from-blue-700 to-sky-500 p-5 flex flex-col justify-between text-white">
+                <div className="flex justify-between items-center">
+                  <span className="px-2.5 py-1 rounded-lg bg-black/25 text-xs font-semibold">{doc.category}</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white/20 text-xs font-semibold">{doc.mediaType}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-white/90">{doc.date}</span>
+                  <span className="px-3 py-1 rounded-full bg-white text-slate-900 text-xs font-semibold opacity-0 group-hover:opacity-100 transition">
+                    Lihat Detail
+                  </span>
+                </div>
+              </div>
             )}
             <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
               <div>
@@ -1051,6 +1534,300 @@ function PublicAspirasi() {
         { date: `${dateStr} ${timeStr}`, status: 'Baru Masuk', note: 'Aspirasi dikirimkan melalui portal publik.' }
       ]
     };
+
+    setDb(prev => ({ ...prev, aspirasi: [newItem, ...prev.aspirasi] }));
+    addNotification('Aspirasi Baru Masuk', `[${ticketNumber}] ${form.subject}`, 'aspirasi');
+    setCreatedTicket(ticketNumber);
+    setTrackInput(ticketNumber);
+    showToast(`Aspirasi terkirim! Nomor Tiket: ${ticketNumber}`);
+    setForm({ senderName: '', contact: '', category: 'Sarana & Prasarana', subject: '', content: '', attachment: '' });
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+      <div className="text-center max-w-2xl mx-auto space-y-2">
+        <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">Suara Masyarakat & Wali Murid</span>
+        <h1 className="font-['Poppins'] text-2xl sm:text-3xl font-bold text-slate-900">Layanan Aspirasi, Kritik & Saran</h1>
+        <p className="text-sm text-slate-500">
+          Sampaikan masukan konstruktif Anda untuk kemajuan {SCHOOL_INFO.name} dan pantau progres tindak lanjutnya menggunakan nomor tiket.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <form onSubmit={handleSubmit} className="lg:col-span-6 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
+          <h2 className="font-['Poppins'] font-bold text-lg text-slate-900">Formulir Penyampaian Aspirasi</h2>
+
+          {createdTicket && (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs space-y-1">
+              <div className="font-bold text-sm">Aspirasi Berhasil Dikirim!</div>
+              <div>Simpan nomor tiket Anda: <span className="font-mono font-bold text-emerald-700 text-sm">{createdTicket}</span></div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Pengirim (Opsional / Anonim)</label>
+              <input
+                type="text"
+                value={form.senderName}
+                onChange={e => setForm({ ...form, senderName: e.target.value })}
+                placeholder="Kosongkan jika ingin Anonim"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor HP / Email (Opsional)</label>
+              <input
+                type="text"
+                value={form.contact}
+                onChange={e => setForm({ ...form, contact: e.target.value })}
+                placeholder="Untuk konfirmasi lanjutan"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori Aspirasi</label>
+            <select
+              value={form.category}
+              onChange={e => setForm({ ...form, category: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option>Sarana & Prasarana</option>
+              <option>Akademik & Pembelajaran</option>
+              <option>Pelayanan Administrasi</option>
+              <option>Kesiswaan & Ekstrakurikuler</option>
+              <option>Lainnya</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Subjek / Judul Singkat *</label>
+            <input
+              type="text"
+              required
+              value={form.subject}
+              onChange={e => setForm({ ...form, subject: e.target.value })}
+              placeholder="Contoh: Usulan penambahan buku cerita di pojok baca"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Uraian Aspirasi / Pengaduan *</label>
+            <textarea
+              rows={4}
+              required
+              value={form.content}
+              onChange={e => setForm({ ...form, content: e.target.value })}
+              placeholder="Jelaskan detail aspirasi, lokasi, atau harapan Anda..."
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Lampiran Pendukung (Opsional)</label>
+            <input
+              type="file"
+              onChange={e => setForm({ ...form, attachment: e.target.files?.[0]?.name || '' })}
+              className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-3 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm shadow-md transition flex items-center justify-center gap-2"
+          >
+            <Send className="w-4 h-4" /> Kirim Aspirasi & Buat Tiket
+          </button>
+        </form>
+
+        {/* Pelacakan Tiket Aspirasi */}
+        <div className="lg:col-span-6 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-5">
+          <div>
+            <h2 className="font-['Poppins'] font-bold text-lg text-slate-900">Lacak Status Aspirasi (Real-Time)</h2>
+            <p className="text-xs text-slate-500">Masukkan nomor tiket untuk melihat progres penanganan oleh sekolah.</p>
+          </div>
+
+          <input
+            type="text"
+            value={trackInput}
+            onChange={e => setTrackInput(e.target.value)}
+            placeholder="Masukkan nomor tiket (misal: ASP-2026-8821)"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-slate-400">Contoh tiket:</span>
+            {db.aspirasi.slice(0, 3).map(a => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setTrackInput(a.ticketNumber)}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 font-mono transition"
+              >
+                {a.ticketNumber}
+              </button>
+            ))}
+          </div>
+
+          {trackedItem ? (
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                <div>
+                  <span className="font-mono text-xs font-bold text-blue-700">{trackedItem.ticketNumber}</span>
+                  <h4 className="font-bold text-slate-900 text-base">{trackedItem.subject}</h4>
+                </div>
+                <StatusBadge status={trackedItem.status} />
+              </div>
+
+              <div className="text-xs text-slate-600 space-y-1">
+                <div><strong>Kategori:</strong> {trackedItem.category} • <strong>Tanggal:</strong> {trackedItem.createdAt}</div>
+                <div><strong>Tanggapan Resmi Sekolah:</strong> <span className="text-slate-800">{trackedItem.publicNote || 'Sedang dalam peninjauan.'}</span></div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">Riwayat Progres Penanganan</div>
+                <div className="space-y-2.5 border-l-2 border-blue-500 pl-4 ml-1">
+                  {trackedItem.history.map((h, i) => (
+                    <div key={i} className="text-xs">
+                      <div className="font-semibold text-slate-800">{h.status} <span className="font-normal text-slate-400">({h.date})</span></div>
+                      <div className="text-slate-600">{h.note}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 text-slate-400 text-xs">
+              Nomor tiket tidak ditemukan. Pastikan format nomor tiket benar (contoh: ASP-2026-8821).
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- 7F. PUBLIC PENGUMUMAN & BERITA SEKOLAH (PENGGANTI BERITA ACARA FORMAL) ---
+function PublicPengumuman() {
+  const { db } = useSchool();
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('Semua');
+  const [selectedNews, setSelectedNews] = useState(null);
+
+  const publicList = db.pengumuman.filter(p => p.visibility === 'Publik');
+  const categories = ['Semua', ...new Set(publicList.map(p => p.category))];
+
+  const filtered = publicList.filter(p => {
+    const matchSearch = p.title.toLowerCase().includes(search.toLowerCase()) || p.content.toLowerCase().includes(search.toLowerCase());
+    const matchCat = category === 'Semua' || p.category === category;
+    return matchSearch && matchCat;
+  });
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <div>
+        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">Informasi & Kabar Sekolah</span>
+        <h1 className="font-['Poppins'] text-2xl sm:text-3xl font-bold text-slate-900 mt-2">Pengumuman & Berita {SCHOOL_INFO.name}</h1>
+        <p className="text-sm text-slate-500">Kumpulan pengumuman resmi, informasi akademik, dan berita kegiatan terbaru sekolah.</p>
+      </div>
+
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cari judul pengumuman atau berita..."
+            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm bg-white outline-none"
+        >
+          {categories.map(c => <option key={c} value={c}>Kategori: {c}</option>)}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map(item => (
+          <div key={item.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs flex flex-col justify-between">
+            <div>
+              {item.photoUrl ? (
+                <img src={item.photoUrl} alt={item.title} className="w-full h-44 object-cover" />
+              ) : (
+                <div className="h-40 bg-gradient-to-br from-blue-700 to-sky-500 p-5 flex flex-col justify-between text-white">
+                  <span className="px-2.5 py-1 rounded-lg bg-black/25 text-xs font-semibold self-start">{item.category}</span>
+                  <div className="flex items-center gap-2 text-xs text-sky-100">
+                    <Newspaper className="w-4 h-4" />
+                    <span>{item.photoName || 'Berita Sekolah'}</span>
+                  </div>
+                </div>
+              )}
+              <div className="p-5 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-semibold text-blue-700">{item.category}</span>
+                  <span>{item.date}</span>
+                </div>
+                <h3 className="font-['Poppins'] font-bold text-slate-900 text-base">{item.title}</h3>
+                <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">{item.content}</p>
+              </div>
+            </div>
+
+            <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/50">
+              <button
+                onClick={() => setSelectedNews(item)}
+                className="w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs transition flex items-center justify-center gap-1.5"
+              >
+                <Eye className="w-4 h-4" /> Baca Selengkapnya
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal open={!!selectedNews} onClose={() => setSelectedNews(null)} title="Detail Pengumuman & Berita Sekolah" maxWidth="max-w-2xl">
+        {selectedNews && (
+          <div className="space-y-4">
+            {selectedNews.photoUrl && (
+              <img src={selectedNews.photoUrl} alt={selectedNews.title} className="w-full max-h-80 object-cover rounded-2xl border border-slate-200" />
+            )}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-semibold">{selectedNews.category}</span>
+              <span className="text-slate-400">Dipublikasikan pada {selectedNews.date}</span>
+            </div>
+            <h3 className="font-['Poppins'] text-xl font-bold text-slate-900">{selectedNews.title}</h3>
+            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{selectedNews.content}</p>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+// --- 7G. PUBLIC ACADEMIC CALENDAR (DENGAN UNDUH PDF YANG BERFUNGSI) ---
+function PublicCalendar() {
+  const { db, showToast } = useSchool();
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('Semua');
+  const [currentMonth, setCurrentMonth] = useState('2026-11');
+
+  const approvedEvents = db.agendas.filter(a => a.status === 'Disetujui');
+  const categories = ['Semua', ...new Set(approvedEvents.map(a => a.category))];
+
+  const filtered = approvedEvents.filter(a => {
+    const matchSearch = a.title.toLowerCase().includes(search.toLowerCase()) || a.location.toLowerCase().includes(search.toLowerCase());
+    const matchCat = categoryFilter === 'Semua' || a.category === categoryFilter;
+    return matchSearch && matchCat;
+  });
+
+  const [yearNum, monthNum] = currentMonth.split('-').map(Number);
+  const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
   const firstDayIdx = new Date(yearNum, monthNum - 1, 1).getDay();
   const todayStr = '2026-11-17';
 
@@ -1143,7 +1920,387 @@ function PublicAspirasi() {
           })}
         </div>
       </div>
-        
+
+      {/* Upcoming List */}
+      <div className="space-y-3">
+        <h3 className="font-['Poppins'] font-bold text-lg text-slate-900">Daftar Agenda Terjadwal</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filtered.map(ev => (
+            <div key={ev.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${colorMap[ev.color] || colorMap.blue}`}>{ev.category}</span>
+                  <span className="text-xs font-semibold text-slate-500">{ev.date} • {ev.startTime} - {ev.endTime} WIB</span>
+                </div>
+                <h4 className="font-bold text-slate-900 text-sm">{ev.title}</h4>
+                <p className="text-xs text-slate-600">{ev.description}</p>
+                <div className="text-xs text-slate-500 flex items-center gap-1 pt-1">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" /> {ev.location}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 8. ADMIN & PORTAL DASHBOARD INTERFACE (KEPALA SEKOLAH & GURU)
+// ============================================================================
+
+function AdminDashboard() {
+  const { db, setDb, currentUser, setCurrentUser, setViewMode, showToast } = useSchool();
+  const [activeModule, setActiveModule] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  const unreadNotifs = db.notifications.filter(n => n.unread).length;
+
+  // Both Kepala Sekolah & Guru have access to Buku Tamu & Aspirasi as requested
+  const menuItems = [
+    { id: 'dashboard', label: 'Dashboard Utama', icon: LayoutDashboard, roles: ['kepala_sekolah', 'guru'] },
+    { id: 'kalender', label: 'Kalender Akademik & Agenda', icon: CalendarIcon, roles: ['kepala_sekolah', 'guru'] },
+    { id: 'aspirasi', label: 'Manajemen Aspirasi', icon: MessageSquare, roles: ['kepala_sekolah', 'guru'] },
+    { id: 'bukutamu', label: 'Buku Tamu Digital', icon: Users, roles: ['kepala_sekolah', 'guru'] },
+    { id: 'tindaklanjut', label: 'Manajemen Tindak Lanjut', icon: ClipboardList, roles: ['kepala_sekolah', 'guru'] },
+    { id: 'dokumentasi', label: 'Dokumentasi Kegiatan', icon: ImageIcon, roles: ['kepala_sekolah'] },
+    { id: 'pengumuman', label: 'Pengumuman & Berita', icon: Newspaper, roles: ['kepala_sekolah'] },
+    { id: 'profil', label: 'Profil & Foto Akun', icon: User, roles: ['kepala_sekolah', 'guru'] }
+  ];
+
+  const allowedMenu = menuItems.filter(m => m.roles.includes(currentUser.role));
+
+  const markAllRead = () => {
+    setDb(prev => ({
+      ...prev,
+      notifications: prev.notifications.map(n => ({ ...n, unread: false }))
+    }));
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setViewMode('public');
+    showToast('Anda telah keluar dari portal.', 'info');
+  };
+
+  return (
+    <div className="min-h-screen flex bg-slate-100 text-slate-800 font-['Inter']">
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-68 bg-slate-900 text-slate-200 flex flex-col transition-transform lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-400 text-white flex items-center justify-center shadow-md">
+              <School className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-['Poppins'] font-bold text-white text-sm">{SCHOOL_INFO.name}</div>
+              <div className="text-[11px] text-sky-400 font-medium">NPSN: {SCHOOL_INFO.npsn}</div>
+            </div>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Role Card (Without Personal Names, Shows Uploaded Profile Photo) */}
+        <div className="p-4 mx-3 mt-4 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center gap-3">
+          <UserAvatar user={currentUser} size="w-11 h-11 text-sm" />
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-emerald-400 font-bold">Portal Akses</div>
+            <div className="text-base font-bold text-white font-['Poppins']">{currentUser.roleLabel}</div>
+          </div>
+        </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {allowedMenu.map(item => (
+            <button
+              key={item.id}
+              onClick={() => { setActiveModule(item.id); setSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition ${
+                activeModule === item.id
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <item.icon className="w-4 h-4 shrink-0" />
+              <span className="truncate">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-slate-800 space-y-2">
+          <button
+            onClick={() => setViewMode('public')}
+            className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs font-semibold flex items-center justify-center gap-2 transition"
+          >
+            <ExternalLink className="w-3.5 h-3.5" /> Lihat Website Publik
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-full py-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center justify-center gap-2 transition"
+          >
+            <LogOut className="w-3.5 h-3.5" /> Keluar Sistem
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Workspace */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100">
+              <Menu className="w-5 h-5" />
+            </button>
+            <div>
+              <h2 className="font-['Poppins'] font-bold text-slate-900 text-base sm:text-lg">
+                {menuItems.find(m => m.id === activeModule)?.label}
+              </h2>
+              <p className="text-xs text-slate-500 hidden sm:block">Portal {currentUser.roleLabel} • {SCHOOL_INFO.name}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen(!notifOpen)}
+                className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 relative transition"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadNotifs > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center">
+                    {unreadNotifs}
+                  </span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">Pusat Notifikasi</span>
+                    <button onClick={markAllRead} className="text-[11px] font-semibold text-blue-700 hover:underline">
+                      Tandai dibaca
+                    </button>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                    {db.notifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-slate-400">Belum ada notifikasi baru.</div>
+                    ) : (
+                      db.notifications.map(n => (
+                        <div
+                          key={n.id}
+                          onClick={() => { setActiveModule(n.targetTab || 'dashboard'); setNotifOpen(false); }}
+                          className={`p-3.5 text-xs cursor-pointer hover:bg-slate-50 ${n.unread ? 'bg-blue-50/40' : ''}`}
+                        >
+                          <div className="font-bold text-slate-800 flex justify-between">
+                            <span>{n.title}</span>
+                            <span className="text-[10px] text-slate-400 font-normal">{n.time}</span>
+                          </div>
+                          <p className="text-slate-600 mt-0.5">{n.message}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setViewMode('public')}
+              className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-blue-600" /> Portal Publik
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {activeModule === 'dashboard' && <AdminOverview onNavigate={setActiveModule} />}
+          {activeModule === 'kalender' && <AdminCalendarModule />}
+          {activeModule === 'aspirasi' && <AdminAspirasiModule onNavigate={setActiveModule} />}
+          {activeModule === 'bukutamu' && <AdminGuestbookModule />}
+          {activeModule === 'tindaklanjut' && <AdminFollowUpModule />}
+          {activeModule === 'dokumentasi' && <AdminDocumentationModule />}
+          {activeModule === 'pengumuman' && <AdminPengumumanModule />}
+          {activeModule === 'profil' && <AdminProfileModule />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// --- 8A. ADMIN OVERVIEW & ANALYTICS (TANPA LOG AKTIVITAS SISTEM) ---
+function AdminOverview({ onNavigate }) {
+  const { db } = useSchool();
+
+  const pendingAspirasi = db.aspirasi.filter(a => a.status === 'Baru Masuk' || a.status === 'Diverifikasi').length;
+  const unverifiedGuests = db.guestbook.filter(g => !g.verified).length;
+  const activeFollowUps = db.followUps.filter(f => f.status !== 'Selesai').length;
+  const pendingAgendas = db.agendas.filter(a => a.status === 'Menunggu Persetujuan').length;
+
+  const monthlyTrendData = [
+    { bulan: 'Jul', pengunjung: 24, aspirasi: 5 },
+    { bulan: 'Agu', pengunjung: 31, aspirasi: 8 },
+    { bulan: 'Sep', pengunjung: 28, aspirasi: 6 },
+    { bulan: 'Okt', pengunjung: 39, aspirasi: 11 },
+    { bulan: 'Nov', pengunjung: db.guestbook.length + 22, aspirasi: db.aspirasi.length + 4 }
+  ];
+
+  const aspirasiCategoryData = useMemo(() => {
+    const counts = {};
+    db.aspirasi.forEach(a => {
+      counts[a.category] = (counts[a.category] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [db.aspirasi]);
+
+  const PIE_COLORS = ['#1d4ed8', '#0284c7', '#10b981', '#f59e0b', '#6366f1'];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div onClick={() => onNavigate('aspirasi')} className="cursor-pointer bg-white p-5 rounded-2xl border border-slate-200 hover:border-blue-300 shadow-xs transition">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">Total Aspirasi Masuk</span>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="font-['Poppins'] text-2xl font-bold text-slate-900 mt-2">{db.aspirasi.length}</div>
+          <div className="text-xs text-amber-600 font-medium mt-1">{pendingAspirasi} menunggu tindak lanjut</div>
+        </div>
+
+        <div onClick={() => onNavigate('bukutamu')} className="cursor-pointer bg-white p-5 rounded-2xl border border-slate-200 hover:border-emerald-300 shadow-xs transition">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">Buku Tamu Digital</span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <Users className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="font-['Poppins'] text-2xl font-bold text-slate-900 mt-2">{db.guestbook.length}</div>
+          <div className="text-xs text-sky-700 font-medium mt-1">{unverifiedGuests} belum diverifikasi</div>
+        </div>
+
+        <div onClick={() => onNavigate('kalender')} className="cursor-pointer bg-white p-5 rounded-2xl border border-slate-200 hover:border-sky-300 shadow-xs transition">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">Agenda & Kalender</span>
+            <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
+              <CalendarIcon className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="font-['Poppins'] text-2xl font-bold text-slate-900 mt-2">{db.agendas.length}</div>
+          <div className="text-xs text-amber-600 font-medium mt-1">{pendingAgendas} menunggu persetujuan</div>
+        </div>
+
+        <div onClick={() => onNavigate('tindaklanjut')} className="cursor-pointer bg-white p-5 rounded-2xl border border-slate-200 hover:border-purple-300 shadow-xs transition">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">Tindak Lanjut Aktif</span>
+            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
+              <ClipboardList className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="font-['Poppins'] text-2xl font-bold text-slate-900 mt-2">{activeFollowUps}</div>
+          <div className="text-xs text-emerald-700 font-medium mt-1">{db.followUps.length} total program</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div>
+            <h3 className="font-['Poppins'] font-bold text-slate-900 text-base">Grafik Kunjungan & Aspirasi Bulanan</h3>
+            <p className="text-xs text-slate-500">Pemantauan partisipasi masyarakat & tamu sekolah</p>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyTrendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="bulan" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Legend />
+                <Area type="monotone" dataKey="pengunjung" name="Pengunjung Tamu" stroke="#1d4ed8" fill="#93c5fd" fillOpacity={0.45} />
+                <Area type="monotone" dataKey="aspirasi" name="Aspirasi Masuk" stroke="#10b981" fill="#6ee7b7" fillOpacity={0.45} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div>
+            <h3 className="font-['Poppins'] font-bold text-slate-900 text-base">Sebaran Kategori Aspirasi</h3>
+            <p className="text-xs text-slate-500">Klasifikasi laporan & saran masyarakat</p>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={aspirasiCategoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                  {aspirasiCategoryData.map((_, idx) => (
+                    <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- 8B. KALENDER AKADEMIK & AGENDA SEKOLAH (INTEGRASI GURU -> KEPALA SEKOLAH -> PUBLIK) ---
+function AdminCalendarModule() {
+  const { db, setDb, currentUser, showToast, addNotification } = useSchool();
+  const isKepsek = currentUser.role === 'kepala_sekolah';
+  const isGuru = currentUser.role === 'guru';
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingAgenda, setEditingAgenda] = useState(null);
+  const [verifyModal, setVerifyModal] = useState(null);
+  const [revisionNoteInput, setRevisionNoteInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Semua');
+
+  const [form, setForm] = useState({
+    title: '',
+    date: '2026-11-25',
+    startTime: '08:00',
+    endTime: '10:00',
+    location: 'Aula Utama',
+    category: 'Akademik',
+    color: 'blue',
+    description: '',
+    attachment: ''
+  });
+
+  const scheduleConflicts = useMemo(() => {
+    if (!form.date || !form.location) return [];
+    return db.agendas.filter(a =>
+      a.id !== editingAgenda?.id &&
+      a.status !== 'Ditolak' &&
+      a.date === form.date &&
+      a.location.toLowerCase() === form.location.toLowerCase()
+    );
+  }, [db.agendas, form.date, form.location, editingAgenda]);
+
+  // Kepala Sekolah sees all agendas; Guru sees all approved school agendas + their own submissions/drafts/revisions
+  const visibleAgendas = useMemo(() => {
+    return db.agendas.filter(a => {
+      if (isKepsek) return true;
+      return a.submitterId === currentUser.id || a.status === 'Disetujui';
+    });
+  }, [db.agendas, isKepsek, currentUser.id]);
+
+  const filteredAgendas = visibleAgendas.filter(a => {
+    const matchSearch = a.title.toLowerCase().includes(search.toLowerCase()) || a.location.toLowerCase().includes(search.toLowerCase());
+    const matchMonth = !monthFilter || a.date.startsWith(monthFilter);
+    const matchStatus = statusFilter === 'Semua' || a.status === statusFilter;
+    return matchSearch && matchMonth && matchStatus;
+  });
+
   const pendingApprovals = db.agendas.filter(a => a.status === 'Menunggu Persetujuan');
   const guruNeedsRevision = db.agendas.filter(a => a.submitterId === currentUser.id && a.status === 'Perlu Revisi');
 
@@ -1244,7 +2401,386 @@ function PublicAspirasi() {
     }
     setModalOpen(false);
   };
-                        rows={3}
+
+  const handleVerifyDecision = (decision) => {
+    if (!verifyModal) return;
+    if (decision === 'Perlu Revisi' && !revisionNoteInput.trim()) {
+      showToast('Harap tuliskan catatan revisi untuk Guru!', 'error');
+      return;
+    }
+
+    setDb(prev => ({
+      ...prev,
+      agendas: prev.agendas.map(a =>
+        a.id === verifyModal.id
+          ? {
+              ...a,
+              status: decision,
+              revisionNote: decision === 'Perlu Revisi' ? revisionNoteInput.trim() : (decision === 'Ditolak' ? revisionNoteInput.trim() : '')
+            }
+          : a
+      )
+    }));
+
+    const notifMsg =
+      decision === 'Disetujui'
+        ? `Agenda "${verifyModal.title}" disetujui Kepala Sekolah & otomatis terbit di Kalender Publik.`
+        : decision === 'Perlu Revisi'
+        ? `Agenda "${verifyModal.title}" diminta revisi: ${revisionNoteInput}`
+        : `Agenda "${verifyModal.title}" ditolak oleh Kepala Sekolah.`;
+
+    addNotification(`Status Pengajuan Agenda: ${decision}`, notifMsg, 'kalender');
+    showToast(
+      decision === 'Disetujui'
+        ? 'Agenda disetujui & otomatis terintegrasi ke Kalender Publik!'
+        : `Status pengajuan diperbarui menjadi "${decision}".`
+    );
+    setVerifyModal(null);
+    setRevisionNoteInput('');
+  };
+
+  const deleteAgenda = (id) => {
+    setDb(prev => ({ ...prev, agendas: prev.agendas.filter(a => a.id !== id) }));
+    showToast('Agenda berhasil dihapus.', 'info');
+  };
+
+  const handlePrintPDF = () => {
+    showToast('Membuka pratinjau cetak PDF Kalender Akademik...');
+    downloadCalendarPDF(filteredAgendas.filter(a => a.status === 'Disetujui'), monthFilter);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header & Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="font-['Poppins'] font-bold text-slate-900">
+            {isKepsek ? 'Kalender Akademik & Verifikasi Agenda Sekolah' : 'Pengajuan & Kalender Agenda Kegiatan Guru'}
+          </h3>
+          <p className="text-xs text-slate-500">
+            {isKepsek
+              ? 'Verifikasi pengajuan agenda Guru (Setujui / Revisi / Tolak). Agenda yang disetujui otomatis tampil di Kalender Publik.'
+              : 'Ajukan kegiatan baru atau sunting/revisi pengajuan Anda untuk diverifikasi oleh Kepala Sekolah.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handlePrintPDF}
+            className="px-4 py-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold flex items-center gap-1.5"
+          >
+            <Printer className="w-4 h-4 text-blue-700" /> Cetak / Unduh PDF
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold shadow-sm flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> {isKepsek ? 'Tambah Agenda Resmi' : 'Ajukan Agenda Kegiatan'}
+          </button>
+        </div>
+      </div>
+
+      {/* Kepala Sekolah: Pending Approval Banner */}
+      {isKepsek && pendingApprovals.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <span>Pengajuan Agenda Guru Menunggu Verifikasi ({pendingApprovals.length})</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {pendingApprovals.map(item => (
+              <div key={item.id} className="bg-white p-3.5 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="font-bold text-slate-900 text-sm">{item.title}</div>
+                  <div className="text-xs text-slate-500">{item.date} ({item.startTime} - {item.endTime}) • {item.location}</div>
+                  <div className="text-[11px] text-blue-700 font-medium">Kategori: {item.category} • Pengaju: {item.submittedBy}</div>
+                </div>
+                <button
+                  onClick={() => { setVerifyModal(item); setRevisionNoteInput(item.revisionNote || ''); }}
+                  className="px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shrink-0"
+                >
+                  Verifikasi Pengajuan
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Guru: Revision Request Alert Banner */}
+      {isGuru && guruNeedsRevision.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-orange-900 font-bold text-sm">
+            <AlertTriangle className="w-5 h-5 text-orange-600" />
+            <span>Pengajuan Agenda Memerlukan Revisi dari Kepala Sekolah ({guruNeedsRevision.length})</span>
+          </div>
+          <div className="space-y-2">
+            {guruNeedsRevision.map(item => (
+              <div key={item.id} className="bg-white p-3.5 rounded-xl border border-orange-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-900 text-sm">{item.title} <span className="text-xs font-normal text-slate-500">({item.date})</span></div>
+                  <div className="text-xs text-orange-800 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-100">
+                    <strong>Catatan Revisi Kepsek:</strong> {item.revisionNote}
+                  </div>
+                </div>
+                <button
+                  onClick={() => openEditModal(item)}
+                  className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold shrink-0 flex items-center gap-1.5"
+                >
+                  <Edit className="w-3.5 h-3.5" /> Sunting & Ajukan Ulang
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row gap-3">
+        <input
+          type="month"
+          value={monthFilter}
+          onChange={e => setMonthFilter(e.target.value)}
+          className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm text-slate-700"
+        />
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cari nama kegiatan atau lokasi..."
+            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm outline-none"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+        >
+          <option value="Semua">Semua Status</option>
+          <option value="Disetujui">Disetujui (Tampil Publik)</option>
+          <option value="Menunggu Persetujuan">Menunggu Persetujuan</option>
+          <option value="Perlu Revisi">Perlu Revisi</option>
+          <option value="Ditolak">Ditolak</option>
+          {isGuru && <option value="Draft">Draft</option>}
+        </select>
+      </div>
+
+      {/* Agenda & Submission Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+              <tr>
+                <th className="px-5 py-3">Kegiatan & Kategori</th>
+                <th className="px-5 py-3">Jadwal & Lokasi</th>
+                <th className="px-5 py-3">Pengaju</th>
+                <th className="px-5 py-3">Status & Publikasi</th>
+                <th className="px-5 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredAgendas.map(ag => {
+                const canGuruEdit = isGuru && ag.submitterId === currentUser.id;
+                return (
+                  <tr key={ag.id} className="hover:bg-slate-50/70">
+                    <td className="px-5 py-3.5">
+                      <div className="font-bold text-slate-900">{ag.title}</div>
+                      <div className="text-xs text-blue-700 font-medium mt-0.5">{ag.category}</div>
+                      {ag.revisionNote && (
+                        <div className="text-[11px] text-orange-700 mt-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-100 inline-block">
+                          Catatan: {ag.revisionNote}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-600">
+                      <div className="font-semibold text-slate-800">{ag.date} ({ag.startTime} - {ag.endTime})</div>
+                      <div>{ag.location}</div>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-600">{ag.submittedBy}</td>
+                    <td className="px-5 py-3.5 space-y-1">
+                      <div><StatusBadge status={ag.status} /></div>
+                      {ag.status === 'Disetujui' && (
+                        <div className="text-[10px] font-semibold text-emerald-700">✓ Otomatis di Kalender Publik</div>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-right space-x-1">
+                      {isKepsek && (
+                        <button
+                          onClick={() => { setVerifyModal(ag); setRevisionNoteInput(ag.revisionNote || ''); }}
+                          className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold"
+                        >
+                          Verifikasi
+                        </button>
+                      )}
+                      {(isKepsek || canGuruEdit) && (
+                        <button
+                          onClick={() => openEditModal(ag)}
+                          className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
+                          title={isGuru ? 'Sunting / Revisi Pengajuan' : 'Edit Agenda'}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {(isKepsek || canGuruEdit) && (
+                        <button
+                          onClick={() => deleteAgenda(ag.id)}
+                          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"
+                          title="Hapus"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal Form: Create / Edit / Revise Agenda */}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={
+          isKepsek
+            ? (editingAgenda ? 'Edit Agenda Sekolah' : 'Tambah Agenda Kalender Akademik')
+            : (editingAgenda ? 'Sunting / Revisi Pengajuan Agenda Guru' : 'Formulir Pengajuan Agenda Kegiatan Guru')
+        }
+      >
+        <form onSubmit={(e) => saveAgenda(e, false)} className="space-y-4">
+          {scheduleConflicts.length > 0 && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+              <div>
+                <strong>Deteksi Benturan Jadwal!</strong> Lokasi <strong>{form.location}</strong> pada tanggal <strong>{form.date}</strong> sudah terjadwal untuk kegiatan: <em>"{scheduleConflicts[0].title}"</em>.
+              </div>
+            </div>
+          )}
+
+          {editingAgenda?.revisionNote && isGuru && (
+            <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-900 text-xs">
+              <strong>Catatan Revisi dari Kepala Sekolah:</strong> {editingAgenda.revisionNote}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Kegiatan / Agenda *</label>
+            <input
+              type="text"
+              required
+              value={form.title}
+              onChange={e => setForm({ ...form, title: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"
+              placeholder="Contoh: Kunjungan Edukasi Perpustakaan Daerah"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal</label>
+              <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Waktu Mulai</label>
+              <input type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Waktu Selesai</label>
+              <input type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Lokasi Kegiatan</label>
+              <input type="text" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
+              <select
+                value={form.category}
+                onChange={e => {
+                  const cat = e.target.value;
+                  const cMap = { 'Akademik': 'emerald', 'Rapat & Dinas': 'blue', 'Kesiswaan': 'amber', 'Lomba & Prestasi': 'purple' };
+                  setForm({ ...form, category: cat, color: cMap[cat] || 'blue' });
+                }}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+              >
+                <option>Akademik</option>
+                <option>Rapat & Dinas</option>
+                <option>Kesiswaan</option>
+                <option>Lomba & Prestasi</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Deskripsi & Tujuan Kegiatan</label>
+            <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Lampiran Proposal / Jadwal (Opsional)</label>
+            <input
+              type="file"
+              onChange={e => setForm({ ...form, attachment: e.target.files?.[0]?.name || form.attachment })}
+              className="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700"
+            />
+            {form.attachment && <div className="text-[11px] text-blue-700 mt-1">Lampiran: {form.attachment}</div>}
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-slate-100">
+            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700">
+              Batal
+            </button>
+            {isGuru && (
+              <button
+                type="button"
+                onClick={() => saveAgenda(null, true)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold"
+              >
+                Simpan Draft
+              </button>
+            )}
+            <button type="submit" className="px-5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold">
+              {isKepsek ? 'Simpan & Terbitkan ke Kalender Publik' : 'Kirim Pengajuan ke Kepala Sekolah'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal Verifikasi Kepala Sekolah (Disetujui / Revisi / Ditolak) */}
+      <Modal
+        open={!!verifyModal}
+        onClose={() => setVerifyModal(null)}
+        title="Verifikasi Pengajuan Agenda Kegiatan (Kepala Sekolah)"
+        maxWidth="max-w-lg"
+      >
+        {verifyModal && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-blue-700">{verifyModal.category}</span>
+                <StatusBadge status={verifyModal.status} />
+              </div>
+              <h4 className="font-bold text-slate-900 text-base">{verifyModal.title}</h4>
+              <div><strong>Waktu:</strong> {verifyModal.date} ({verifyModal.startTime} - {verifyModal.endTime} WIB)</div>
+              <div><strong>Lokasi:</strong> {verifyModal.location} • <strong>Pengaju:</strong> {verifyModal.submittedBy}</div>
+              {verifyModal.description && <p className="text-slate-600 pt-1">{verifyModal.description}</p>}
+              {verifyModal.attachment && <div className="text-blue-700 font-medium pt-1">Lampiran: {verifyModal.attachment}</div>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Catatan Evaluasi / Arahan Revisi (Wajib diisi jika meminta revisi)
+              </label>
+              <textarea
+                rows={3}
                 value={revisionNoteInput}
                 onChange={e => setRevisionNoteInput(e.target.value)}
                 placeholder="Tuliskan catatan persetujuan, alasan penolakan, atau poin revisi bagi Guru..."
@@ -1337,6 +2873,425 @@ function AdminAspirasiModule({ onNavigate }) {
     showToast(`Tiket ${selectedItem.ticketNumber} berhasil diperbarui!`);
     setSelectedItem(null);
   };
+
+  const createFollowUpFromAspirasi = (item) => {
+    const existing = db.followUps.find(f => f.sourceRef === item.ticketNumber);
+    if (existing) {
+      showToast(`Tiket ini sudah terhubung dengan ${existing.code}. Mengalihkan...`, 'info');
+      onNavigate('tindaklanjut');
+      return;
+    }
+    const code = `TL-2026-${Math.floor(100 + Math.random() * 899)}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const newFu = {
+      id: `fu-${Date.now()}`,
+      code,
+      title: `Tindak Lanjut: ${item.subject}`,
+      sourceType: 'Aspirasi',
+      sourceRef: item.ticketNumber,
+      actionPlan: item.content,
+      pic: 'Kepala Sekolah',
+      priority: item.priority || 'Sedang',
+      deadline: '2026-11-30',
+      status: 'Belum Dimulai',
+      evidenceNote: '',
+      evidenceFileName: '',
+      evidenceFileUrl: '',
+      timeline: [{ date: today, status: 'Belum Dimulai', note: `Dibuat otomatis dari tiket aspirasi ${item.ticketNumber}.` }]
+    };
+
+    setDb(prev => ({
+      ...prev,
+      followUps: [newFu, ...prev.followUps],
+      aspirasi: prev.aspirasi.map(a =>
+        a.id === item.id
+          ? {
+              ...a,
+              status: 'Dalam Tindak Lanjut',
+              linkedFollowUpId: newFu.id,
+              history: [...a.history, { date: today, status: 'Dalam Tindak Lanjut', note: `Dihubungkan ke Tindak Lanjut (${code}).` }]
+            }
+          : a
+      )
+    }));
+    showToast(`Berhasil membuat Tindak Lanjut ${code} dari aspirasi!`);
+    setSelectedItem(null);
+    onNavigate('tindaklanjut');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cari nomor tiket, subjek, atau pengirim..."
+            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm outline-none"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+        >
+          <option value="Semua">Semua Status</option>
+          <option value="Baru Masuk">Baru Masuk</option>
+          <option value="Diverifikasi">Diverifikasi</option>
+          <option value="Dalam Tindak Lanjut">Dalam Tindak Lanjut</option>
+          <option value="Selesai">Selesai</option>
+        </select>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+              <tr>
+                <th className="px-5 py-3">Tiket & Tanggal</th>
+                <th className="px-5 py-3">Pengirim & Kategori</th>
+                <th className="px-5 py-3">Subjek Aspirasi</th>
+                <th className="px-5 py-3">Prioritas</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.map(item => (
+                <tr key={item.id} className="hover:bg-slate-50/70">
+                  <td className="px-5 py-3.5">
+                    <div className="font-mono text-xs font-bold text-blue-700">{item.ticketNumber}</div>
+                    <div className="text-[11px] text-slate-400">{item.createdAt}</div>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div className="font-semibold text-slate-800">{item.senderName}</div>
+                    <div className="text-xs text-slate-500">{item.category}</div>
+                  </td>
+                  <td className="px-5 py-3.5 max-w-xs">
+                    <div className="font-semibold text-slate-900 truncate">{item.subject}</div>
+                    <div className="text-xs text-slate-500 truncate">{item.content}</div>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <PriorityBadge priority={item.priority} />
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <StatusBadge status={item.status} />
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <button
+                      onClick={() => openManageModal(item)}
+                      className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition"
+                    >
+                      Kelola Tiket
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <Modal open={!!selectedItem} onClose={() => setSelectedItem(null)} title={`Kelola Aspirasi (${selectedItem?.ticketNumber || ''})`}>
+        {selectedItem && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+              <div className="font-bold text-slate-900 text-sm">{selectedItem.subject}</div>
+              <div className="text-slate-500">Pengirim: {selectedItem.senderName} ({selectedItem.contact}) • Kategori: {selectedItem.category}</div>
+              <p className="text-slate-700 pt-1 leading-relaxed">{selectedItem.content}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Status Penanganan</label>
+                <select
+                  value={editState.status}
+                  onChange={e => setEditState({ ...editState, status: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+                >
+                  <option>Baru Masuk</option>
+                  <option>Diverifikasi</option>
+                  <option>Dalam Tindak Lanjut</option>
+                  <option>Selesai</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Prioritas</label>
+                <select
+                  value={editState.priority}
+                  onChange={e => setEditState({ ...editState, priority: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+                >
+                  <option>Rendah</option>
+                  <option>Sedang</option>
+                  <option>Tinggi</option>
+                  <option>Mendesak</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggapan Publik (Tampil di Pelacakan Tiket)</label>
+              <textarea
+                rows={2}
+                value={editState.publicNote}
+                onChange={e => setEditState({ ...editState, publicNote: e.target.value })}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Internal Sekolah</label>
+              <textarea
+                rows={2}
+                value={editState.internalNote}
+                onChange={e => setEditState({ ...editState, internalNote: e.target.value })}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-between gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => createFollowUpFromAspirasi(selectedItem)}
+                className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold flex items-center gap-1.5"
+              >
+                <Link2 className="w-4 h-4" /> Hubungkan ke Tindak Lanjut
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveStatus}
+                className="px-5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold"
+              >
+                Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+// --- 8D. MANAJEMEN BUKU TAMU (KEPALA SEKOLAH & GURU - DENGAN AKSI VERIFIKASI) ---
+function AdminGuestbookModule() {
+  const { db, setDb, showToast } = useSchool();
+  const [search, setSearch] = useState('');
+  const [purposeFilter, setPurposeFilter] = useState('Semua');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: '', institution: '', phone: '', purpose: 'Kunjungan Dinas', destination: '', notes: '' });
+
+  const filtered = db.guestbook.filter(g => {
+    const matchSearch = g.name.toLowerCase().includes(search.toLowerCase()) || g.institution.toLowerCase().includes(search.toLowerCase()) || g.regNumber.toLowerCase().includes(search.toLowerCase());
+    const matchPurpose = purposeFilter === 'Semua' || g.purpose === purposeFilter;
+    return matchSearch && matchPurpose;
+  });
+
+  const toggleVerifyGuest = (guest) => {
+    const nextState = !guest.verified;
+    setDb(prev => ({
+      ...prev,
+      guestbook: prev.guestbook.map(g => g.id === guest.id ? { ...g, verified: nextState } : g)
+    }));
+    showToast(nextState ? `Kunjungan ${guest.regNumber} telah diverifikasi!` : `Verifikasi ${guest.regNumber} dibatalkan.`);
+  };
+
+  const exportCSV = () => {
+    const headers = ['No Registrasi,Nama,Instansi,No HP,Keperluan,Tujuan Kunjungan,Tanggal,Waktu,Status Verifikasi'];
+    const rows = filtered.map(g => `"${g.regNumber}","${g.name}","${g.institution}","${g.phone}","${g.purpose}","${g.destination}","${g.date}","${g.time}","${g.verified ? 'Terverifikasi' : 'Menunggu Verifikasi'}"`);
+    const blob = new Blob([headers.concat(rows).join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Laporan_Buku_Tamu_SDN_Merjosari_2.csv`;
+    a.click();
+    showToast('Laporan Buku Tamu (Excel/CSV) berhasil diunduh!');
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    if (editing) {
+      setDb(prev => ({ ...prev, guestbook: prev.guestbook.map(g => g.id === editing.id ? { ...g, ...form } : g) }));
+      showToast('Data kunjungan diperbarui!');
+    } else {
+      const now = new Date();
+      const newEntry = {
+        id: `gb-${Date.now()}`,
+        regNumber: `GT-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        ...form,
+        date: now.toISOString().slice(0, 10),
+        time: now.toTimeString().slice(0, 5),
+        verified: true
+      };
+      setDb(prev => ({ ...prev, guestbook: [newEntry, ...prev.guestbook] }));
+      showToast('Data kunjungan baru ditambahkan!');
+    }
+    setModalOpen(false);
+  };
+
+  const handleDelete = (id) => {
+    setDb(prev => ({ ...prev, guestbook: prev.guestbook.filter(g => g.id !== id) }));
+    showToast('Data kunjungan dihapus.', 'info');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button onClick={exportCSV} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5">
+            <Download className="w-4 h-4" /> Ekspor Excel (CSV)
+          </button>
+          <button onClick={() => window.print()} className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5">
+            <Printer className="w-4 h-4" /> Cetak PDF
+          </button>
+        </div>
+        <button
+          onClick={() => { setEditing(null); setForm({ name: '', institution: '', phone: '', purpose: 'Kunjungan Dinas', destination: '', notes: '' }); setModalOpen(true); }}
+          className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold flex items-center gap-1.5"
+        >
+          <Plus className="w-4 h-4" /> Tambah Kunjungan
+        </button>
+      </div>
+
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama, instansi, atau nomor registrasi..." className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm outline-none" />
+        </div>
+        <select value={purposeFilter} onChange={e => setPurposeFilter(e.target.value)} className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm bg-white">
+          <option value="Semua">Semua Keperluan</option>
+          <option>Kunjungan Dinas</option>
+          <option>Wali Murid</option>
+          <option>Penelitian/Magang</option>
+          <option>Kerjasama / Mitra</option>
+          <option>Lainnya</option>
+        </select>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+              <tr>
+                <th className="px-5 py-3">No. Reg & Waktu</th>
+                <th className="px-5 py-3">Nama & Instansi</th>
+                <th className="px-5 py-3">Tujuan Kunjungan</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.map(g => (
+                <tr key={g.id} className="hover:bg-slate-50/70">
+                  <td className="px-5 py-3.5">
+                    <div className="font-mono text-xs font-bold text-blue-700">{g.regNumber}</div>
+                    <div className="text-[11px] text-slate-400">{g.date} • {g.time}</div>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div className="font-semibold text-slate-800">{g.name}</div>
+                    <div className="text-xs text-slate-500">{g.institution} • {g.phone}</div>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className="px-2 py-0.5 rounded bg-sky-50 text-sky-800 text-xs font-semibold">{g.purpose}</span>
+                    <div className="text-xs text-slate-700 mt-1">{g.destination}</div>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <StatusBadge status={g.verified ? 'Terverifikasi' : 'Menunggu Verifikasi'} />
+                  </td>
+                  <td className="px-5 py-3.5 text-right space-x-1.5">
+                    <button
+                      onClick={() => toggleVerifyGuest(g)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        g.verified
+                          ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      }`}
+                    >
+                      {g.verified ? 'Batal Verif' : 'Verifikasi'}
+                    </button>
+                    <button onClick={() => { setEditing(g); setForm(g); setModalOpen(true); }} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><Edit className="w-4 h-4" /></button>
+                    <button onClick={() => handleDelete(g.id)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Data Pengunjung' : 'Input Kunjungan Manual'}>
+        <form onSubmit={handleSave} className="space-y-3">
+          <input required type="text" placeholder="Nama Pengunjung" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          <input required type="text" placeholder="Instansi / Asal" value={form.institution} onChange={e => setForm({ ...form, institution: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          <input required type="text" placeholder="Nomor HP" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          <select value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+            <option>Kunjungan Dinas</option>
+            <option>Wali Murid</option>
+            <option>Penelitian/Magang</option>
+            <option>Kerjasama / Mitra</option>
+            <option>Lainnya</option>
+          </select>
+          <input required type="text" placeholder="Tujuan Kunjungan (isian bebas)" value={form.destination} onChange={e => setForm({ ...form, destination: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          <textarea rows={2} placeholder="Catatan tambahan" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          <button type="submit" className="w-full py-2.5 rounded-xl bg-blue-700 text-white font-semibold text-sm">Simpan Data</button>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+// --- 8E. MANAJEMEN TINDAK LANJUT (GURU: BERDASARKAN DATA ASPIRASI + UPLOAD FOTO; KEPSEK: UPLOAD FOTO/FILE) ---
+function AdminFollowUpModule() {
+  const { db, setDb, currentUser, showToast } = useSchool();
+  const isGuru = currentUser.role === 'guru';
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [detailModal, setDetailModal] = useState(null);
+
+  const [form, setForm] = useState({
+    title: '',
+    sourceType: 'Aspirasi',
+    sourceRef: db.aspirasi[0]?.ticketNumber || '',
+    actionPlan: '',
+    pic: currentUser.roleLabel,
+    priority: 'Sedang',
+    deadline: '2026-11-30',
+    status: 'Belum Dimulai',
+    evidenceFileName: '',
+    evidenceFileUrl: ''
+  });
+
+  const [progressUpdate, setProgressUpdate] = useState({
+    status: '',
+    note: '',
+    evidenceNote: '',
+    evidenceFileName: '',
+    evidenceFileUrl: ''
+  });
+
+  // For Guru portal: strictly display follow-ups sourced from Aspirasi data
+  const visibleFollowUps = isGuru
+    ? db.followUps.filter(f => f.sourceType === 'Aspirasi')
+    : db.followUps;
+
+  const handleFileUploadCreate = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    readFileAsDataUrl(file, ({ name, url }) => {
+      setForm(prev => ({ ...prev, evidenceFileName: name, evidenceFileUrl: url }));
+      showToast(`Berkas "${name}" siap diunggah!`);
+    });
+  };
+
+  const handleFileUploadUpdate = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    readFileAsDataUrl(file, ({ name, url }) => {
+      setProgressUpdate(prev => ({ ...prev, evidenceFileName: name, evidenceFileUrl: url }));
+      showToast(`Foto/File "${name}" berhasil dilampirkan!`);
     });
   };
 
@@ -1424,18 +3379,524 @@ function AdminAspirasiModule({ onNavigate }) {
           <Plus className="w-4 h-4" /> {isGuru ? 'Tambah Tindak Lanjut Aspirasi' : 'Tambah Tindak Lanjut'}
         </button>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {visibleFollowUps.map(fu => (
+          <div key={fu.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-bold text-blue-700">{fu.code}</span>
+                <StatusBadge status={fu.status} />
+              </div>
+              <h4 className="font-['Poppins'] font-bold text-slate-900 text-sm">{fu.title}</h4>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-medium">
+                <Link2 className="w-3 h-3 text-blue-600" /> Sumber: {fu.sourceType} ({fu.sourceRef})
+              </div>
+              <p className="text-xs text-slate-600 line-clamp-2">{fu.actionPlan}</p>
+
+              {/* Thumbnail Preview if image uploaded */}
+              {fu.evidenceFileUrl && fu.evidenceFileUrl.startsWith('data:image') && (
+                <img src={fu.evidenceFileUrl} alt="Bukti Tindak Lanjut" className="w-full h-28 object-cover rounded-xl border border-slate-200" />
+              )}
+              {fu.evidenceFileName && (
+                <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                  <ImageIcon className="w-3.5 h-3.5" /> Bukti: {fu.evidenceFileName}
+                </div>
+              )}
+
+              <div className="text-xs text-slate-500 pt-1 space-y-0.5">
+                <div><strong>Penanggung Jawab:</strong> {fu.pic}</div>
+                <div className="flex items-center justify-between">
+                  <span><strong>Deadline:</strong> {fu.deadline}</span>
+                  <PriorityBadge priority={fu.priority} />
+                </div>
+              </div>
+            </div>
+
+            <button onClick={() => openDetail(fu)} className="w-full py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition">
+              Update Timeline & {isGuru ? 'Upload Foto Bukti' : 'Upload Foto / File'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Create Modal */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={isGuru ? 'Tambah Tindak Lanjut dari Data Aspirasi' : 'Buat Rencana Tindak Lanjut Baru'}>
+        <form onSubmit={createFollowUp} className="space-y-3">
+          {isGuru ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Pilih Tiket Data Aspirasi *</label>
+              <select
+                required
+                value={form.sourceRef}
+                onChange={e => {
+                  const chosen = db.aspirasi.find(a => a.ticketNumber === e.target.value);
+                  setForm({
+                    ...form,
+                    sourceType: 'Aspirasi',
+                    sourceRef: e.target.value,
+                    title: chosen ? `Tindak Lanjut: ${chosen.subject}` : form.title,
+                    actionPlan: chosen ? chosen.content : form.actionPlan
+                  });
+                }}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+              >
+                {db.aspirasi.map(a => (
+                  <option key={a.id} value={a.ticketNumber}>{a.ticketNumber} — {a.subject}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <select value={form.sourceType} onChange={e => setForm({ ...form, sourceType: e.target.value })} className="px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+                <option>Aspirasi</option>
+                <option>Temuan Internal</option>
+              </select>
+              <input type="text" placeholder="Referensi (misal: ASP-2026-8821)" value={form.sourceRef} onChange={e => setForm({ ...form, sourceRef: e.target.value })} className="px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+          )}
+
+          <input required type="text" placeholder="Judul Tindak Lanjut" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          <textarea required rows={3} placeholder="Rencana tindakan konkret..." value={form.actionPlan} onChange={e => setForm({ ...form, actionPlan: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+
+          <div className="grid grid-cols-2 gap-3">
+            <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} className="px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+              <option>Rendah</option>
+              <option>Sedang</option>
+              <option>Tinggi</option>
+              <option>Mendesak</option>
+            </select>
+            <input type="date" value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} className="px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              {isGuru ? 'Upload Foto Pendukung (Opsional)' : 'Upload Foto atau File Pendukung (Opsional)'}
+            </label>
+            <input
+              type="file"
+              accept={isGuru ? 'image/*' : 'image/*,.pdf,.doc,.docx'}
+              onChange={handleFileUploadCreate}
+              className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700"
+            />
+          </div>
+
+          <button type="submit" className="w-full py-2.5 rounded-xl bg-blue-700 text-white text-sm font-semibold">Simpan Tindak Lanjut</button>
+        </form>
+      </Modal>
+
+      {/* Timeline & Upload Foto/File Modal */}
+      <Modal open={!!detailModal} onClose={() => setDetailModal(null)} title={`Timeline & Bukti (${detailModal?.code || ''})`}>
+        {detailModal && (
+          <div className="space-y-4">
+            <div className="space-y-2 border-l-2 border-emerald-500 pl-4 ml-1">
+              {detailModal.timeline.map((t, i) => (
+                <div key={i} className="text-xs">
+                  <div className="font-bold text-slate-800">{t.status} <span className="font-normal text-slate-400">({t.date})</span></div>
+                  <div className="text-slate-600">{t.note}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Perbarui Status</label>
+                <select value={progressUpdate.status} onChange={e => setProgressUpdate({ ...progressUpdate, status: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+                  <option>Belum Dimulai</option>
+                  <option>Sedang Berlangsung</option>
+                  <option>Menunggu Verifikasi</option>
+                  <option>Perlu Perbaikan</option>
+                  <option>Selesai</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Perkembangan Baru</label>
+                <input type="text" value={progressUpdate.note} onChange={e => setProgressUpdate({ ...progressUpdate, note: e.target.value })} placeholder="Tuliskan progres terbaru..." className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Keterangan Bukti Penyelesaian</label>
+                <input type="text" value={progressUpdate.evidenceNote} onChange={e => setProgressUpdate({ ...progressUpdate, evidenceNote: e.target.value })} placeholder="Deskripsi bukti penyelesaian..." className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+              </div>
+
+              {/* Upload Foto / File */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <label className="block text-xs font-semibold text-slate-700">
+                  {isGuru ? 'Upload Foto Bukti Tindak Lanjut' : 'Upload Foto atau File Bukti Penyelesaian'}
+                </label>
+                <input
+                  type="file"
+                  accept={isGuru ? 'image/*' : 'image/*,.pdf,.doc,.docx,.xls,.xlsx'}
+                  onChange={handleFileUploadUpdate}
+                  className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                />
+                {progressUpdate.evidenceFileUrl && progressUpdate.evidenceFileUrl.startsWith('data:image') && (
+                  <img src={progressUpdate.evidenceFileUrl} alt="Preview Bukti" className="w-full max-h-44 object-cover rounded-xl border border-slate-200 mt-2" />
+                )}
+                {progressUpdate.evidenceFileName && (
+                  <div className="text-xs font-medium text-blue-700">File terlampir: {progressUpdate.evidenceFileName}</div>
+                )}
+              </div>
+
+              <button onClick={saveProgress} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+                Simpan Pembaruan & Bukti
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+// --- 8F. MANAJEMEN DOKUMENTASI KEGIATAN (TANPA TEMA + UPLOAD FOTO/FILE) ---
+function AdminDocumentationModule() {
+  const { db, setDb, showToast } = useSchool();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    title: '',
+    category: 'Akademik',
+    date: '2026-11-17',
+    mediaType: 'Foto',
+    status: 'Terbit',
+    description: '',
+    fileName: '',
+    fileUrl: ''
+  });
+
+  const openModal = (item = null) => {
+    setEditing(item);
+    setForm(item || {
+      title: '',
+      category: 'Akademik',
+      date: '2026-11-17',
+      mediaType: 'Foto',
+      status: 'Terbit',
+      description: '',
+      fileName: '',
+      fileUrl: ''
+    });
+    setModalOpen(true);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    readFileAsDataUrl(file, ({ name, type, url }) => {
+      const detectedType = type.startsWith('video/') ? 'Video' : 'Foto';
+      setForm(prev => ({ ...prev, fileName: name, fileUrl: url, mediaType: detectedType }));
+      showToast(`File "${name}" berhasil dipilih!`);
+    });
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    const year = form.date.slice(0, 4);
+    if (editing) {
+      setDb(prev => ({ ...prev, dokumentasi: prev.dokumentasi.map(d => d.id === editing.id ? { ...d, ...form, year } : d) }));
+      showToast('Dokumentasi diperbarui!');
+    } else {
+      const newDoc = { id: `dok-${Date.now()}`, ...form, year };
+      setDb(prev => ({ ...prev, dokumentasi: [newDoc, ...prev.dokumentasi] }));
+      showToast(form.status === 'Terbit' ? 'Dokumentasi diterbitkan ke Website Publik!' : 'Dokumentasi disimpan.');
+    }
+    setModalOpen(false);
+  };
+
+  const handleDelete = (id) => {
+    setDb(prev => ({ ...prev, dokumentasi: prev.dokumentasi.filter(d => d.id !== id) }));
+    showToast('Dokumentasi dihapus.', 'info');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-['Poppins'] font-bold text-slate-900">Kelola Galeri Dokumentasi</h3>
+          <p className="text-xs text-slate-500">Unggah foto atau file dokumentasi kegiatan sekolah untuk ditampilkan di Portal Publik.</p>
+        </div>
+        <button onClick={() => openModal()} className="px-4 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold flex items-center gap-1.5">
+          <Plus className="w-4 h-4" /> Unggah Dokumentasi
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {db.dokumentasi.map(doc => (
+          <div key={doc.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs flex flex-col justify-between">
+            <div>
+              {doc.fileUrl && doc.mediaType === 'Foto' ? (
+                <div className="h-36 relative">
+                  <img src={doc.fileUrl} alt={doc.title} className="w-full h-full object-cover" />
+                  <div className="absolute top-3 right-3"><StatusBadge status={doc.status} /></div>
+                </div>
+              ) : (
+                <div className="h-28 bg-gradient-to-r from-blue-700 to-sky-500 p-4 flex justify-between items-start text-white">
+                  <span className="px-2.5 py-0.5 rounded bg-black/25 text-xs font-semibold">{doc.category}</span>
+                  <StatusBadge status={doc.status} />
+                </div>
+              )}
+              <div className="p-4 space-y-1.5">
+                <div className="text-[11px] text-slate-400">{doc.date} • {doc.mediaType} {doc.fileName ? `(${doc.fileName})` : ''}</div>
+                <h4 className="font-bold text-slate-900 text-sm">{doc.title}</h4>
+                <p className="text-xs text-slate-600 line-clamp-2">{doc.description}</p>
+              </div>
+            </div>
+            <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+              <button onClick={() => openModal(doc)} className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100">Edit</button>
+              <button onClick={() => handleDelete(doc.id)} className="px-3 py-1.5 rounded-lg bg-rose-50 text-xs font-semibold text-rose-600 hover:bg-rose-100">Hapus</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Dokumentasi' : 'Unggah Dokumentasi Kegiatan'}>
+        <form onSubmit={handleSave} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Kegiatan *</label>
+            <input required type="text" placeholder="Judul Kegiatan" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
+              <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+                <option>Akademik</option>
+                <option>Kesiswaan</option>
+                <option>Ekstrakurikuler</option>
+                <option>Rapat & Dinas</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal</label>
+              <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+                <option>Terbit</option>
+                <option>Draft</option>
+                <option>Diarsipkan</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Upload Foto atau File (Tanpa Pilihan Tema) */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <label className="block text-xs font-semibold text-slate-700">Upload Foto atau File Dokumentasi</label>
+            <input
+              type="file"
+              accept="image/*,video/*,.pdf"
+              onChange={handleFileChange}
+              className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+            {form.fileUrl && form.mediaType === 'Foto' && (
+              <img src={form.fileUrl} alt="Preview" className="w-full max-h-44 object-cover rounded-xl border border-slate-200 mt-2" />
+            )}
+            {form.fileName && <div className="text-xs text-blue-700 font-medium">Terpilih: {form.fileName}</div>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Deskripsi Kegiatan *</label>
+            <textarea required rows={3} placeholder="Deskripsi dokumentasi kegiatan..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          </div>
+
+          <button type="submit" className="w-full py-2.5 rounded-xl bg-blue-700 text-white text-sm font-semibold">Simpan Dokumentasi</button>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+// --- 8G. MANAJEMEN PENGUMUMAN & BERITA SEKOLAH (DENGAN UPLOAD FOTO) ---
+function AdminPengumumanModule() {
+  const { db, setDb, showToast } = useSchool();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    title: '',
+    date: '2026-11-17',
+    category: 'Pengumuman Sekolah',
+    visibility: 'Publik',
+    photoUrl: '',
+    photoName: '',
+    content: ''
+  });
+
+  const openModal = (item = null) => {
+    setEditing(item);
+    setForm(item || {
+      title: '',
+      date: '2026-11-17',
+      category: 'Pengumuman Sekolah',
+      visibility: 'Publik',
+      photoUrl: '',
+      photoName: '',
+      content: ''
+    });
+    setModalOpen(true);
+  };
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    readFileAsDataUrl(file, ({ name, url }) => {
+      setForm(prev => ({ ...prev, photoName: name, photoUrl: url }));
+      showToast(`Foto "${name}" siap diunggah!`);
+    });
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    if (editing) {
+      setDb(prev => ({ ...prev, pengumuman: prev.pengumuman.map(p => p.id === editing.id ? { ...p, ...form } : p) }));
+      showToast('Pengumuman / Berita diperbarui!');
+    } else {
+      const newItem = { id: `pg-${Date.now()}`, ...form };
+      setDb(prev => ({ ...prev, pengumuman: [newItem, ...prev.pengumuman] }));
+      showToast('Pengumuman / Berita berhasil diterbitkan!');
+    }
+    setModalOpen(false);
+  };
+
+  const handleDelete = (id) => {
+    setDb(prev => ({ ...prev, pengumuman: prev.pengumuman.filter(p => p.id !== id) }));
+    showToast('Pengumuman dihapus.', 'info');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-['Poppins'] font-bold text-slate-900">Kelola Pengumuman & Berita Sekolah</h3>
+          <p className="text-xs text-slate-500">Publikasi berita kegiatan dan pengumuman resmi dengan unggahan foto.</p>
+        </div>
+        <button onClick={() => openModal()} className="px-4 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold flex items-center gap-1.5">
+          <Plus className="w-4 h-4" /> Buat Pengumuman / Berita
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {db.pengumuman.map(item => (
+          <div key={item.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs flex flex-col justify-between">
+            <div>
+              {item.photoUrl ? (
+                <img src={item.photoUrl} alt={item.title} className="w-full h-36 object-cover" />
+              ) : (
+                <div className="h-28 bg-gradient-to-r from-blue-700 to-sky-500 p-4 flex justify-between items-start text-white">
+                  <span className="px-2.5 py-0.5 rounded bg-black/25 text-xs font-semibold">{item.category}</span>
+                  <StatusBadge status={item.visibility} />
+                </div>
+              )}
+              <div className="p-4 space-y-1.5">
+                <div className="text-[11px] text-slate-400">{item.date} • {item.category}</div>
+                <h4 className="font-bold text-slate-900 text-sm">{item.title}</h4>
+                <p className="text-xs text-slate-600 line-clamp-3">{item.content}</p>
+              </div>
+            </div>
+            <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+              <button onClick={() => openModal(item)} className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100">Edit</button>
+              <button onClick={() => handleDelete(item.id)} className="px-3 py-1.5 rounded-lg bg-rose-50 text-xs font-semibold text-rose-600 hover:bg-rose-100">Hapus</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Pengumuman / Berita' : 'Tambah Pengumuman & Berita Baru'}>
+        <form onSubmit={handleSave} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Pengumuman / Berita *</label>
+            <input required type="text" placeholder="Judul berita atau pengumuman..." value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
+              <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+                <option>Pengumuman Sekolah</option>
+                <option>Informasi Akademik</option>
+                <option>Kegiatan Sekolah</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal</label>
+              <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Status Tayang</label>
+              <select value={form.visibility} onChange={e => setForm({ ...form, visibility: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+                <option>Publik</option>
+                <option>Draft</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Upload Foto Berita */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <label className="block text-xs font-semibold text-slate-700">Upload Foto Pengumuman / Berita</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoUpload}
+              className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+            {form.photoUrl && (
+              <img src={form.photoUrl} alt="Preview Berita" className="w-full max-h-44 object-cover rounded-xl border border-slate-200 mt-2" />
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Isi Pengumuman / Berita *</label>
+            <textarea required rows={4} placeholder="Tuliskan isi berita atau pengumuman lengkap di sini..." value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+          </div>
+
+          <button type="submit" className="w-full py-2.5 rounded-xl bg-blue-700 text-white text-sm font-semibold">Simpan & Publikasikan</button>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+// --- 8H. PROFIL AKUN (TANPA LOG AKTIVITAS + UPLOAD FOTO PROFIL) ---
+function AdminProfileModule() {
+  const { db, setDb, currentUser, setCurrentUser, showToast, resetDemoData } = useSchool();
+  const [profileForm, setProfileForm] = useState({
+    phone: currentUser.phone,
+    email: currentUser.email,
+    newPassword: '',
+    photoUrl: currentUser.photoUrl || ''
+  });
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    readFileAsDataUrl(file, ({ url }) => {
+      setProfileForm(prev => ({ ...prev, photoUrl: url }));
+      const updatedUser = { ...currentUser, photoUrl: url };
+      setCurrentUser(updatedUser);
+      setDb(prev => ({
+        ...prev,
+        users: prev.users.map(u => u.id === currentUser.id ? updatedUser : u)
+      }));
+      showToast('Foto profil berhasil diperbarui!');
+    });
+  };
+
+  const handleUpdateProfile = (e) => {
+    e.preventDefault();
     const updatedUser = {
       ...currentUser,
       phone: profileForm.phone,
-      photoUrl: profileForm.photoUrl
+      email: profileForm.email,
+      photoUrl: profileForm.photoUrl,
+      password: profileForm.newPassword ? profileForm.newPassword : currentUser.password
     };
     setCurrentUser(updatedUser);
     setDb(prev => ({
       ...prev,
       users: prev.users.map(u => u.id === currentUser.id ? updatedUser : u)
     }));
-    setProfileForm(prev => ({ ...prev, newPassword: '', email: currentUser.email }));
-    showToast(profileForm.newPassword ? 'Kata sandi akun berhasil diperbarui di Supabase!' : 'Pengaturan akun berhasil diperbarui!');
+    setProfileForm(prev => ({ ...prev, newPassword: '' }));
+    showToast('Pengaturan akun berhasil diperbarui!');
   };
 
   return (
@@ -1467,12 +3928,12 @@ function AdminAspirasiModule({ onNavigate }) {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Email Resmi</label>
-              <input type="email" value={currentUser.email} readOnly className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-slate-50 text-slate-500" />
+              <input type="email" value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
             </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Ubah Kata Sandi Login ({currentUser.roleLabel})</label>
-            <input type="password" placeholder="Kosongkan jika tidak ingin mengubah kata sandi (minimal 8 karakter)" value={profileForm.newPassword} onChange={e => setProfileForm({ ...profileForm, newPassword: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
+            <input type="password" placeholder="Kosongkan jika tidak ingin mengubah kata sandi" value={profileForm.newPassword} onChange={e => setProfileForm({ ...profileForm, newPassword: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
           </div>
           <button type="submit" className="w-full py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold shadow-sm">
             Simpan Perubahan Akun
