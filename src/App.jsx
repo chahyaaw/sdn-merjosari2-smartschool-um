@@ -368,7 +368,7 @@ function readFileAsDataUrl(file, callback) {
 
 function downloadCalendarPDF(agendas, monthFilter = '') {
   const filtered = monthFilter
-    ? agendas.filter(a => a.date.startsWith(monthFilter))
+    ? agendas.filter(a => (a.date || '') <= `${monthFilter}-31` && (a.endDate || a.date || '') >= `${monthFilter}-01`)
     : agendas;
 
   const printWindow = window.open('', '_blank', 'width=900,height=700');
@@ -569,7 +569,7 @@ function SchoolProvider({ children }) {
 
       if (!agendaResult.error) {
         updates.agendas = (agendaResult.data || []).map(row => ({
-          id: row.id, title: row.title, date: row.event_date || '',
+          id: row.id, title: row.title, date: row.event_date || '', endDate: row.end_date || row.event_date || '',
           startTime: String(row.start_time || '').slice(0, 5),
           endTime: String(row.end_time || '').slice(0, 5),
           location: row.location || '', category: row.category || 'Lainnya',
@@ -655,7 +655,7 @@ function SchoolProvider({ children }) {
         }
 
         if (!allAgendaResult.error) updates.agendas = (allAgendaResult.data || []).map(row => ({
-          id: row.id, title: row.title, date: row.event_date || '',
+          id: row.id, title: row.title, date: row.event_date || '', endDate: row.end_date || row.event_date || '',
           startTime: String(row.start_time || '').slice(0, 5),
           endTime: String(row.end_time || '').slice(0, 5),
           location: row.location || '', category: row.category || 'Lainnya',
@@ -2128,7 +2128,7 @@ function PublicCalendar() {
           {Array.from({ length: daysInMonth }).map((_, idx) => {
             const day = idx + 1;
             const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
-            const dayEvents = filtered.filter(ev => ev.date === dateStr);
+            const dayEvents = filtered.filter(ev => ev.date <= dateStr && (ev.endDate || ev.date) >= dateStr);
             const isToday = dateStr === todayStr;
 
             return (
@@ -2161,7 +2161,7 @@ function PublicCalendar() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${colorMap[ev.color] || colorMap.blue}`}>{ev.category}</span>
-                  <span className="text-xs font-semibold text-slate-500">{ev.date} • {ev.startTime} - {ev.endTime} WIB</span>
+                  <span className="text-xs font-semibold text-slate-500">{ev.date}{(ev.endDate || ev.date) !== ev.date ? ` s.d. ${ev.endDate}` : ''} • {ev.startTime} - {ev.endTime} WIB</span>
                 </div>
                 <h4 className="font-bold text-slate-900 text-sm">{ev.title}</h4>
                 <p className="text-xs text-slate-600">{ev.description}</p>
@@ -2503,6 +2503,7 @@ function AdminCalendarModule() {
   const [form, setForm] = useState({
     title: '',
     date: '2026-11-25',
+    endDate: '2026-11-25',
     startTime: '08:00',
     endTime: '10:00',
     location: 'Aula Utama',
@@ -2517,7 +2518,7 @@ function AdminCalendarModule() {
     return db.agendas.filter(a =>
       a.id !== editingAgenda?.id &&
       a.status !== 'Ditolak' &&
-      a.date === form.date &&
+      (a.date || '') <= (form.endDate || form.date) && (a.endDate || a.date || '') >= form.date &&
       a.location.toLowerCase() === form.location.toLowerCase()
     );
   }, [db.agendas, form.date, form.location, editingAgenda]);
@@ -2532,7 +2533,7 @@ function AdminCalendarModule() {
 
   const filteredAgendas = visibleAgendas.filter(a => {
     const matchSearch = a.title.toLowerCase().includes(search.toLowerCase()) || a.location.toLowerCase().includes(search.toLowerCase());
-    const matchMonth = !monthFilter || a.date.startsWith(monthFilter);
+    const matchMonth = !monthFilter || ((a.date || '') <= `${monthFilter}-31` && (a.endDate || a.date || '') >= `${monthFilter}-01`);
     const matchStatus = statusFilter === 'Semua' || a.status === statusFilter;
     return matchSearch && matchMonth && matchStatus;
   });
@@ -2561,6 +2562,7 @@ function AdminCalendarModule() {
     setForm({
       title: ag.title,
       date: ag.date,
+      endDate: ag.endDate || ag.date,
       startTime: ag.startTime,
       endTime: ag.endTime,
       location: ag.location,
@@ -2583,10 +2585,16 @@ function AdminCalendarModule() {
       return;
     }
 
+    if (!form.date || !form.endDate || form.endDate < form.date) {
+      showToast('Tanggal selesai harus sama dengan atau setelah tanggal mulai.', 'error');
+      return;
+    }
+
     const nextStatus = isKepsek ? 'Disetujui' : (asDraft ? 'Draft' : 'Menunggu Persetujuan');
     const payload = {
       title: form.title.trim(),
       event_date: form.date,
+      end_date: form.endDate || form.date,
       start_time: form.startTime || null,
       end_time: form.endTime || null,
       location: form.location || null,
@@ -2611,7 +2619,7 @@ function AdminCalendarModule() {
 
     const row = result.data;
     const savedAgenda = {
-      id: row.id, title: row.title, date: row.event_date || '',
+      id: row.id, title: row.title, date: row.event_date || '', endDate: row.end_date || row.event_date || '',
       startTime: String(row.start_time || '').slice(0, 5),
       endTime: String(row.end_time || '').slice(0, 5),
       location: row.location || '', category: row.category || 'Lainnya',
@@ -2849,7 +2857,7 @@ function AdminCalendarModule() {
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-xs text-slate-600">
-                      <div className="font-semibold text-slate-800">{ag.date} ({ag.startTime} - {ag.endTime})</div>
+                      <div className="font-semibold text-slate-800">{ag.date}{(ag.endDate || ag.date) !== ag.date ? ` s.d. ${ag.endDate}` : ''} ({ag.startTime} - {ag.endTime})</div>
                       <div>{ag.location}</div>
                     </td>
                     <td className="px-5 py-3.5 text-xs text-slate-600">{ag.submittedBy}</td>
@@ -2933,10 +2941,14 @@ function AdminCalendarModule() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal</label>
-              <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm" />
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Mulai</label>
+              <input type="date" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value, endDate: form.endDate && form.endDate < e.target.value ? e.target.value : form.endDate })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Selesai</label>
+              <input type="date" required min={form.date} value={form.endDate || form.date} onChange={e => setForm({ ...form, endDate: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Waktu Mulai</label>
