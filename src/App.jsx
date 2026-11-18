@@ -195,7 +195,7 @@ function SchoolProvider({ children }) {
         return;
       }
       const { data: profile, error } = await supabase
-        .from('staff_profiles').select('role, display_name, phone')
+        .from('staff_profiles').select('role, display_name, phone, photo_url')
         .eq('id', authUser.id).maybeSingle();
       if (!active) return;
       if (error || !profile || !['kepala_sekolah', 'guru'].includes(profile.role)) {
@@ -206,7 +206,7 @@ function SchoolProvider({ children }) {
       setCurrentUser({
         id: authUser.id, email: authUser.email || '', role: profile.role, roleLabel,
         name: profile.display_name || roleLabel, phone: profile.phone || '',
-        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR', photoUrl: ''
+        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR', photoUrl: profile.photo_url || ''
       });
       setViewMode('admin');
     };
@@ -568,7 +568,7 @@ function LoginModal({ open, onClose }) {
         setError('Email atau kata sandi tidak sesuai.'); return;
       }
       const { data: profile, error: profileError } = await supabase
-        .from('staff_profiles').select('role, display_name, phone')
+        .from('staff_profiles').select('role, display_name, phone, photo_url')
         .eq('id', authData.user.id).maybeSingle();
       if (profileError || !profile || !['kepala_sekolah', 'guru'].includes(profile.role)) {
         await supabase.auth.signOut();
@@ -582,7 +582,7 @@ function LoginModal({ open, onClose }) {
       setCurrentUser({
         id: authData.user.id, email: authData.user.email || email.trim(), role: profile.role, roleLabel,
         name: profile.display_name || roleLabel, phone: profile.phone || '',
-        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR', photoUrl: ''
+        avatar: profile.role === 'kepala_sekolah' ? 'KS' : 'GR', photoUrl: profile.photo_url || ''
       });
       setViewMode('admin');
       setPassword('');
@@ -1930,8 +1930,8 @@ function AdminDashboard() {
     { id: 'aspirasi', label: 'Manajemen Aspirasi', icon: MessageSquare, roles: ['kepala_sekolah', 'guru'] },
     { id: 'bukutamu', label: 'Buku Tamu Digital', icon: Users, roles: ['kepala_sekolah', 'guru'] },
     { id: 'tindaklanjut', label: 'Manajemen Tindak Lanjut', icon: ClipboardList, roles: ['kepala_sekolah', 'guru'] },
-    { id: 'dokumentasi', label: 'Dokumentasi Kegiatan', icon: ImageIcon, roles: ['kepala_sekolah'] },
-    { id: 'pengumuman', label: 'Pengumuman & Berita', icon: Newspaper, roles: ['kepala_sekolah'] },
+    { id: 'dokumentasi', label: 'Dokumentasi Kegiatan', icon: ImageIcon, roles: ['kepala_sekolah', 'guru'] },
+    { id: 'pengumuman', label: 'Pengumuman & Berita', icon: Newspaper, roles: ['kepala_sekolah', 'guru'] },
     { id: 'profil', label: 'Profil & Foto Akun', icon: User, roles: ['kepala_sekolah', 'guru'] }
   ];
 
@@ -3647,7 +3647,7 @@ function AdminDocumentationModule() {
         const uploaded = await uploadSchoolFile(selectedFile, 'documentation');
         fileUrl = uploaded.url;
         fileName = selectedFile.name;
-        mediaType = selectedFile.type.startsWith('video/') ? 'Video' : 'Foto';
+        mediaType = selectedFile.type.startsWith('video/') ? 'Video' : selectedFile.type === 'application/pdf' ? 'Dokumen PDF' : 'Foto';
       }
       const payload = {
         title: form.title.trim(), category: form.category, event_date: form.date,
@@ -3975,33 +3975,57 @@ function AdminPengumumanModule() {
 // --- 8H. PROFIL AKUN (TANPA LOG AKTIVITAS + UPLOAD FOTO PROFIL) ---
 function AdminProfileModule() {
   const { currentUser, setCurrentUser, showToast } = useSchool();
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [profileForm, setProfileForm] = useState({
     phone: currentUser.phone || '',
     newPassword: ''
   });
   const [saving, setSaving] = useState(false);
 
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Foto profil harus berupa gambar.', 'error');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Ukuran foto maksimal 5 MB.', 'error');
+      e.target.value = '';
+      return;
+    }
+    setSelectedPhoto(file);
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
     setSaving(true);
     try {
+      let photoUrl = currentUser.photoUrl || '';
+      if (selectedPhoto) {
+        const uploaded = await uploadSchoolFile(selectedPhoto, `profile-photos/${currentUser.id}`);
+        photoUrl = uploaded.url;
+      }
+
       const { data: profile, error: profileError } = await supabase
         .from('staff_profiles')
-        .update({ phone: profileForm.phone.trim() || null })
+        .update({ phone: profileForm.phone.trim() || null, photo_url: photoUrl || null })
         .eq('id', currentUser.id)
-        .select('phone')
+        .select('phone, photo_url')
         .single();
       if (profileError) throw profileError;
 
       if (profileForm.newPassword) {
         const { error: passwordError } = await supabase.auth.updateUser({ password: profileForm.newPassword });
-        if (passwordError) throw new Error(`Nomor telepon tersimpan, tetapi kata sandi gagal diperbarui: ${passwordError.message}`);
+        if (passwordError) throw new Error(`Foto dan nomor telepon tersimpan, tetapi kata sandi gagal diperbarui: ${passwordError.message}`);
       }
 
-      setCurrentUser({ ...currentUser, phone: profile?.phone || '' });
+      setCurrentUser({ ...currentUser, phone: profile?.phone || '', photoUrl: profile?.photo_url || '' });
+      setSelectedPhoto(null);
       setProfileForm(prev => ({ ...prev, newPassword: '' }));
-      showToast('Profil petugas berhasil diperbarui.');
+      showToast('Profil dan foto akun berhasil diperbarui.');
     } catch (error) {
       console.error('Gagal memperbarui profil petugas:', error);
       showToast(`Profil gagal diperbarui: ${error.message}`, 'error');
@@ -4013,13 +4037,22 @@ function AdminProfileModule() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-        <div className="pb-5 border-b border-slate-100">
-          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">Akun Portal Resmi</span>
-          <h3 className="font-['Poppins'] font-bold text-xl text-slate-900 mt-2">{currentUser.roleLabel}</h3>
-          <p className="text-xs text-slate-500">{SCHOOL_INFO.name} • NPSN: {SCHOOL_INFO.npsn}</p>
+        <div className="pb-5 border-b border-slate-100 flex items-center gap-4">
+          <UserAvatar user={{ ...currentUser, photoUrl: selectedPhoto ? URL.createObjectURL(selectedPhoto) : currentUser.photoUrl }} size="w-20 h-20 text-xl" />
+          <div>
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">Akun Portal Resmi</span>
+            <h3 className="font-['Poppins'] font-bold text-xl text-slate-900 mt-2">{currentUser.roleLabel}</h3>
+            <p className="text-xs text-slate-500">{SCHOOL_INFO.name} • NPSN: {SCHOOL_INFO.npsn}</p>
+          </div>
         </div>
 
         <form onSubmit={handleUpdateProfile} className="space-y-4">
+          <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
+            <label className="block text-xs font-semibold text-slate-700">Foto Profil</label>
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handlePhotoChange} className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700" />
+            <p className="text-[11px] text-slate-500">Format JPG, PNG, WEBP, atau GIF. Maksimal 5 MB. Foto akan tampil pada profil dan sidebar portal.</p>
+            {selectedPhoto && <p className="text-xs text-emerald-700 font-medium">Foto baru dipilih: {selectedPhoto.name}</p>}
+          </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Email Login</label>
             <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600">{currentUser.email}</div>
@@ -4034,7 +4067,7 @@ function AdminProfileModule() {
             <input type="password" minLength={8} placeholder="Minimal 8 karakter; kosongkan jika tidak diubah" value={profileForm.newPassword} onChange={e => setProfileForm({ ...profileForm, newPassword: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
           </div>
           <button type="submit" disabled={saving} className="w-full py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white text-sm font-semibold shadow-sm">
-            {saving ? 'Menyimpan...' : 'Simpan Perubahan Profil'}
+            {saving ? 'Mengunggah & Menyimpan...' : 'Simpan Profil & Foto'}
           </button>
         </form>
       </div>
