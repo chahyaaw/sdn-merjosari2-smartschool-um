@@ -93,6 +93,23 @@ function readFileAsDataUrl(file, callback) {
   reader.readAsDataURL(file);
 }
 
+function downloadCsv(filename, rows) {
+  if (!rows?.length) return;
+  const headers = Object.keys(rows[0]);
+  const quote = value => `"${String(value ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+  const csv = [headers, ...rows.map(row => headers.map(key => row[key]))]
+    .map(row => row.map(quote).join(';')).join('\r\n');
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ============================================================================
 // 3. PRINT / PDF EXPORT HELPER FOR ACADEMIC CALENDAR
 // ============================================================================
@@ -345,7 +362,7 @@ function SchoolProvider({ children }) {
 
         if (!followUpResult.error) {
           updates.followUps = await Promise.all((followUpResult.data || []).map(async row => ({
-            id: row.id, code: `TL-${(row.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(row.id).slice(0, 3).toUpperCase()}`,
+            id: row.id, linkedAspirasiId: row.linked_aspirasi_id || null, code: `TL-${(row.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(row.id).slice(0, 3).toUpperCase()}`,
             title: row.title, sourceType: row.category || 'Umum',
             sourceRef: (updates.aspirasi || []).find(a => a.id === row.linked_aspirasi_id)?.ticketNumber || '',
             actionPlan: row.description || '',
@@ -1424,6 +1441,7 @@ function PublicAspirasi() {
   const [createdTicket, setCreatedTicket] = useState(null);
   const [trackInput, setTrackInput] = useState('');
   const [trackedResult, setTrackedResult] = useState(null);
+  const [trackedEvidenceUrl, setTrackedEvidenceUrl] = useState('');
   const [isTracking, setIsTracking] = useState(false);
   const [hasTracked, setHasTracked] = useState(false);
 
@@ -1448,7 +1466,15 @@ function PublicAspirasi() {
     try {
       const { data, error } = await supabase.rpc('track_aspirasi', { p_ticket_number: ticket });
       if (error) throw error;
-      setTrackedResult(data || null);
+      let evidenceUrl = '';
+      if (data?.followUp?.evidencePath) {
+        const signed = await supabase.storage.from('follow-up-evidence')
+          .createSignedUrl(data.followUp.evidencePath, 3600);
+        if (!signed.error) evidenceUrl = signed.data?.signedUrl || '';
+        else console.error('Bukti tiket belum dapat dibuka:', signed.error.message);
+      }
+      setTrackedEvidenceUrl(evidenceUrl);
+      setTrackedResult(data ? { ...data, followUp: data.followUp ? { ...data.followUp, evidenceUrl } : null } : null);
       setHasTracked(true);
       if (!data) showToast('Nomor tiket tidak ditemukan. Periksa kembali nomor tiket Anda.', 'error');
     } catch (error) {
@@ -1490,30 +1516,26 @@ function PublicAspirasi() {
     };
 
     try {
-      const { data, error } = await supabase
-        .from('aspirasi')
-        .insert(payload)
-        .select('*')
-        .single();
-
+      // Jangan meminta RETURNING/SELECT dari tabel privat: pengunjung publik hanya diberi hak INSERT.
+      const { error } = await supabase.from('aspirasi').insert(payload);
       if (error) throw error;
 
       const newItem = {
-        id: data.id,
-        ticketNumber: data.ticket_number,
-        senderName: data.sender_name || 'Anonim',
-        contact: data.contact || '-',
-        category: data.category,
-        subject: data.subject,
-        content: data.content,
-        attachment: data.attachment_url || '',
-        status: data.status || 'Baru Masuk',
-        priority: data.priority || 'Sedang',
-        createdAt: (data.created_at || new Date().toISOString()).slice(0, 10),
-        publicNote: data.public_note || '',
-        internalNote: data.internal_note || '',
+        id: ticketNumber,
+        ticketNumber,
+        senderName: form.senderName.trim() || 'Anonim',
+        contact: form.contact.trim() || '-',
+        category: form.category,
+        subject: form.subject.trim(),
+        content: form.content.trim(),
+        attachment: '',
+        status: 'Baru Masuk',
+        priority: 'Sedang',
+        createdAt: dateStr,
+        publicNote: payload.public_note,
+        internalNote: '',
         linkedFollowUpId: null,
-        history: [{ date: new Date(data.created_at || Date.now()).toLocaleString('id-ID'), status: data.status || 'Baru Masuk', note: 'Aspirasi dikirimkan melalui portal publik.' }]
+        history: [{ date: new Date().toLocaleString('id-ID'), status: 'Baru Masuk', note: 'Aspirasi dikirimkan melalui portal publik.' }]
       };
 
       setDb(prev => ({ ...prev, aspirasi: [newItem, ...(prev.aspirasi || [])] }));
@@ -1641,7 +1663,7 @@ function PublicAspirasi() {
             <input
               type="text"
               value={trackInput}
-              onChange={e => { setTrackInput(e.target.value); setTrackedResult(null); setHasTracked(false); }}
+              onChange={e => { setTrackInput(e.target.value); setTrackedResult(null); setTrackedEvidenceUrl(''); setHasTracked(false); }}
               placeholder="Masukkan nomor tiket aspirasi"
               className="min-w-0 flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -1690,6 +1712,28 @@ function PublicAspirasi() {
                   )) : <div className="text-xs text-slate-500">Belum ada pembaruan progres dari pihak sekolah.</div>}
                 </div>
               </div>
+              {trackedItem.followUp && (
+                <div className="pt-3 border-t border-slate-200 space-y-2">
+                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">Perkembangan Tindak Lanjut</div>
+                  <StatusBadge status={trackedItem.followUp.status} />
+                  {(trackedItem.followUp.timeline || []).map((entry, index) => (
+                    <div key={index} className="text-xs border-l-2 border-emerald-400 pl-3">
+                      <div className="font-semibold text-slate-800">{entry.status} <span className="font-normal text-slate-400">({entry.date})</span></div>
+                      <p className="text-slate-600">{entry.note}</p>
+                    </div>
+                  ))}
+                  {trackedEvidenceUrl && trackedItem.followUp.evidenceFileName && (
+                    <a href={trackedEvidenceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-semibold text-blue-700 underline">
+                      <ImageIcon className="w-4 h-4" /> Buka foto bukti: {trackedItem.followUp.evidenceFileName}
+                    </a>
+                  )}
+                  {trackedEvidenceUrl && /\.(png|jpe?g|gif|webp)(?:\?|$)/i.test(trackedItem.followUp.evidenceFileName || '') && (
+                    <a href={trackedEvidenceUrl} target="_blank" rel="noreferrer" className="block">
+                      <img src={trackedEvidenceUrl} alt="Foto bukti tindak lanjut" className="w-full max-h-56 object-contain rounded-xl border border-slate-200" />
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 text-slate-400 text-xs">
@@ -2957,6 +3001,13 @@ function AdminAspirasiModule({ onNavigate }) {
           <option value="Dalam Tindak Lanjut">Dalam Tindak Lanjut</option>
           <option value="Selesai">Selesai</option>
         </select>
+        <button type="button" onClick={() => downloadCsv('data-aspirasi.csv', filtered.map(a => ({
+          'Nomor Tiket': a.ticketNumber, 'Tanggal': a.createdAt, 'Pengirim': a.senderName,
+          'Kontak': a.contact, 'Kategori': a.category, 'Subjek': a.subject, 'Isi Aspirasi': a.content,
+          'Prioritas': a.priority, 'Status': a.status, 'Tanggapan Publik': a.publicNote
+        })))} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold whitespace-nowrap">
+          Ekspor CSV
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
@@ -3353,7 +3404,7 @@ function AdminFollowUpModule() {
     }
     const evidencePreviewUrl = await getFollowUpEvidenceUrl(data.evidence_url || '');
     const newItem = {
-      id: data.id, code: `TL-${(data.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(data.id).slice(0, 3).toUpperCase()}`,
+      id: data.id, linkedAspirasiId: data.linked_aspirasi_id || linkedAspirasi?.id || null, code: `TL-${(data.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(data.id).slice(0, 3).toUpperCase()}`,
       title: data.title, sourceType: data.category || 'Umum', sourceRef: form.sourceRef,
       actionPlan: data.description || '', pic: data.responsible_person || '',
       priority: data.priority || 'Sedang', deadline: data.target_date || '',
@@ -3375,7 +3426,6 @@ function AdminFollowUpModule() {
     setProgressUpdate({
       status: fu.status,
       note: '',
-      evidenceNote: fu.evidenceNote || '',
       evidenceFileName: fu.evidenceFileName || '',
       evidenceFileUrl: fu.evidenceFileUrl || ''
     });
@@ -3406,11 +3456,33 @@ function AdminFollowUpModule() {
     if (error) { console.error(error); showToast(`Progres gagal disimpan: ${error.message}`, 'error'); return; }
     const evidencePreviewUrl = await getFollowUpEvidenceUrl(data.evidence_url || '');
     setDb(prev => ({ ...prev, followUps: prev.followUps.map(f => f.id === detailModal.id ? {
-      ...f, status: data.status, evidenceNote: data.evidence_note || '',
-      evidenceFileName: data.evidence_file_name || '', evidenceFilePath: data.evidence_url || '', evidenceFileUrl: evidencePreviewUrl,
+      ...f, status: data.status, evidenceFileName: data.evidence_file_name || '',
+      evidenceFilePath: data.evidence_url || '', evidenceFileUrl: evidencePreviewUrl,
       timeline: data.timeline || timeline
     } : f) }));
-    showToast('Progres & bukti tindak lanjut berhasil disimpan ke database!');
+
+    // Sinkronkan status dan catatan publik aspirasi agar pelacakan tiket selalu mengikuti progres terbaru.
+    if (detailModal.linkedAspirasiId) {
+      const ticketStatus = data.status === 'Selesai' ? 'Selesai' : 'Dalam Tindak Lanjut';
+      const publicProgressNote = progressUpdate.note.trim() || `Progres tindak lanjut diperbarui: ${data.status}.`;
+      const aspirasiUpdate = await supabase.from('aspirasi')
+        .update({ status: ticketStatus, public_note: publicProgressNote })
+        .eq('id', detailModal.linkedAspirasiId);
+      if (aspirasiUpdate.error) {
+        console.error('Progres tersimpan, tetapi sinkronisasi tiket gagal:', aspirasiUpdate.error);
+        showToast(`Progres tersimpan, tetapi status tiket belum tersinkron: ${aspirasiUpdate.error.message}`, 'error');
+      } else {
+        const historyInsert = await supabase.from('aspirasi_history').insert({
+          aspirasi_id: detailModal.linkedAspirasiId, status: ticketStatus, note: publicProgressNote
+        });
+        if (historyInsert.error) console.error('Riwayat tiket gagal disimpan:', historyInsert.error);
+        setDb(prev => ({ ...prev, aspirasi: prev.aspirasi.map(a => a.id === detailModal.linkedAspirasiId
+          ? { ...a, status: ticketStatus, publicNote: publicProgressNote,
+              history: [...(a.history || []), { date: today, status: ticketStatus, note: publicProgressNote }] }
+          : a) }));
+      }
+    }
+    showToast('Progres, status tiket, catatan, dan bukti tindak lanjut berhasil disimpan!');
     setProgressEvidenceFile(null);
     setDetailModal(null);
   };
@@ -3428,6 +3500,15 @@ function AdminFollowUpModule() {
               : 'Kelola tindak lanjut aspirasi maupun internal lengkap dengan lampiran foto atau dokumen bukti.'}
           </p>
         </div>
+        <button type="button" onClick={() => downloadCsv('data-tindak-lanjut.csv', visibleFollowUps.map(fu => ({
+          'Kode Tindak Lanjut': fu.code, 'Judul': fu.title, 'Sumber': fu.sourceType,
+          'Nomor Tiket': fu.sourceRef, 'Rencana Tindakan': fu.actionPlan, 'Penanggung Jawab': fu.pic,
+          'Prioritas': fu.priority, 'Tenggat': fu.deadline, 'Status': fu.status,
+          'Nama Bukti': fu.evidenceFileName,
+          'Riwayat Perkembangan': (fu.timeline || []).map(t => `${t.date} - ${t.status}: ${t.note}`).join(' | ')
+        })))} className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 self-start">
+          <Download className="w-4 h-4" /> Ekspor CSV
+        </button>
         <button
           onClick={() => {
             setCreateEvidenceFile(null);
@@ -3467,7 +3548,9 @@ function AdminFollowUpModule() {
 
               {/* Thumbnail Preview if image uploaded */}
               {fu.evidenceFileUrl && (fu.evidenceFileUrl.startsWith('data:image') || /\\.(png|jpe?g|gif|webp)(?:\\?|$)/i.test(fu.evidenceFileUrl)) && (
-                <img src={fu.evidenceFileUrl} alt="Bukti Tindak Lanjut" className="w-full h-28 object-cover rounded-xl border border-slate-200" />
+                <button type="button" onClick={() => window.open(fu.evidenceFileUrl, '_blank', 'noopener,noreferrer')} className="block w-full text-left" title="Klik untuk membuka foto bukti">
+                  <img src={fu.evidenceFileUrl} alt="Bukti Tindak Lanjut" className="w-full h-28 object-cover rounded-xl border border-slate-200 hover:opacity-90" />
+                </button>
               )}
               {fu.evidenceFileName && (
                 <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
@@ -3584,10 +3667,6 @@ function AdminFollowUpModule() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Perkembangan Baru</label>
                 <input type="text" value={progressUpdate.note} onChange={e => setProgressUpdate({ ...progressUpdate, note: e.target.value })} placeholder="Tuliskan progres terbaru..." className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Keterangan Bukti Penyelesaian</label>
-                <input type="text" value={progressUpdate.evidenceNote} onChange={e => setProgressUpdate({ ...progressUpdate, evidenceNote: e.target.value })} placeholder="Deskripsi bukti penyelesaian..." className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
-              </div>
 
               {/* Upload Foto / File */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
@@ -3601,7 +3680,9 @@ function AdminFollowUpModule() {
                   className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                 />
                 {progressUpdate.evidenceFileUrl && (progressUpdate.evidenceFileUrl.startsWith('data:image') || /\\.(png|jpe?g|gif|webp)(?:\\?|$)/i.test(progressUpdate.evidenceFileUrl)) && (
-                  <img src={progressUpdate.evidenceFileUrl} alt="Preview Bukti" className="w-full max-h-44 object-cover rounded-xl border border-slate-200 mt-2" />
+                  <a href={progressUpdate.evidenceFileUrl} target="_blank" rel="noreferrer" className="block mt-2" title="Klik untuk membuka foto bukti">
+                    <img src={progressUpdate.evidenceFileUrl} alt="Preview Bukti" className="w-full max-h-44 object-cover rounded-xl border border-slate-200 hover:opacity-90" />
+                  </a>
                 )}
                 {progressUpdate.evidenceFileName && (
                   <div className="text-xs font-medium text-blue-700">File terlampir: {progressUpdate.evidenceFileName}</div>
@@ -3772,6 +3853,7 @@ function AdminDocumentationModule() {
                 <option>Kesiswaan</option>
                 <option>Ekstrakurikuler</option>
                 <option>Rapat & Dinas</option>
+                <option>Lainnya</option>
               </select>
             </div>
             <div>
@@ -3958,6 +4040,7 @@ function AdminPengumumanModule() {
                 <option>Pengumuman Sekolah</option>
                 <option>Informasi Akademik</option>
                 <option>Kegiatan Sekolah</option>
+                <option>Lainnya</option>
               </select>
             </div>
             <div>
@@ -4004,10 +4087,7 @@ function AdminProfileModule() {
   const { currentUser, setCurrentUser, showToast } = useSchool();
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
-  const [profileForm, setProfileForm] = useState({
-    phone: currentUser.phone || '',
-    newPassword: ''
-  });
+  const [profileForm, setProfileForm] = useState({ newPassword: '' });
   const [saving, setSaving] = useState(false);
 
   const handlePhotoChange = (e) => {
@@ -4040,22 +4120,22 @@ function AdminProfileModule() {
 
       const { data: profile, error: profileError } = await supabase
         .from('staff_profiles')
-        .update({ phone: profileForm.phone.trim() || null, photo_url: photoUrl || null })
+        .update({ photo_url: photoUrl || null })
         .eq('id', currentUser.id)
-        .select('phone, photo_url')
+        .select('photo_url')
         .single();
       if (profileError) throw profileError;
 
       if (profileForm.newPassword) {
         const { error: passwordError } = await supabase.auth.updateUser({ password: profileForm.newPassword });
-        if (passwordError) throw new Error(`Foto dan nomor telepon tersimpan, tetapi kata sandi gagal diperbarui: ${passwordError.message}`);
+        if (passwordError) throw new Error(`Foto profil tersimpan, tetapi kata sandi gagal diperbarui: ${passwordError.message}`);
       }
 
-      setCurrentUser({ ...currentUser, phone: profile?.phone || '', photoUrl: profile?.photo_url || '' });
+      setCurrentUser({ ...currentUser, photoUrl: profile?.photo_url || '' });
       setSelectedPhoto(null);
       setPhotoPreview('');
       setProfileForm(prev => ({ ...prev, newPassword: '' }));
-      showToast('Profil dan foto akun berhasil diperbarui.');
+      showToast('Foto profil dan pengaturan akun berhasil diperbarui.');
     } catch (error) {
       console.error('Gagal memperbarui profil petugas:', error);
       showToast(`Profil gagal diperbarui: ${error.message}`, 'error');
@@ -4087,10 +4167,6 @@ function AdminProfileModule() {
             <label className="block text-xs font-semibold text-slate-700 mb-1">Email Login</label>
             <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600">{currentUser.email}</div>
             <p className="text-[11px] text-slate-500 mt-1">Email login dikelola melalui Supabase Auth dan tidak diubah dari formulir ini.</p>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Telepon</label>
-            <input type="tel" value={profileForm.phone} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Ubah Kata Sandi Login</label>
