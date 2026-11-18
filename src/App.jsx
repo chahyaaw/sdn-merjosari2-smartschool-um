@@ -682,13 +682,14 @@ function PublicPortal({ onOpenLogin }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-3">
             <button onClick={() => navigate('beranda')} className="flex items-center gap-3 text-left group">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-white border border-slate-200 p-0.5 shadow-sm group-hover:scale-105 transition overflow-hidden">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center group-hover:scale-105 transition">
                 <img
                   src="/school-logo.jpg"
                   alt="Logo SDN Merjosari 2"
-                  className="w-full h-full object-contain"
-                  width="48"
-                  height="48"
+                  className="block w-full h-full object-contain opacity-100 mix-blend-normal"
+                  style={{ background: 'transparent', filter: 'none' }}
+                  width="56"
+                  height="56"
                 />
               </div>
               <div>
