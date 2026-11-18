@@ -2546,6 +2546,7 @@ function AdminCalendarModule() {
     setForm({
       title: '',
       date: '2026-11-25',
+      endDate: '2026-11-25',
       startTime: '08:00',
       endTime: '10:00',
       location: 'Aula Utama',
