@@ -823,7 +823,7 @@ function PublicPortal({ onOpenLogin }) {
           </div>
         </div>
         <div className="border-t border-slate-800 py-5 px-4 text-center text-xs text-slate-500">
-          © 2026 {SCHOOL_INFO.name} (NPSN: {SCHOOL_INFO.npsn}) – Smart School Information & Management System.
+          © {new Date().getFullYear()} {SCHOOL_INFO.name} (NPSN: {SCHOOL_INFO.npsn}) – Smart School Information & Management System.
         </div>
       </footer>
     </div>
@@ -1424,7 +1424,7 @@ function PublicAspirasi() {
     attachment: ''
   });
   const [createdTicket, setCreatedTicket] = useState(null);
-  const [trackInput, setTrackInput] = useState('ASP-2026-8821');
+  const [trackInput, setTrackInput] = useState('');
 
   const trackedItem = useMemo(() => {
     return db.aspirasi.find(a => a.ticketNumber.toLowerCase() === trackInput.trim().toLowerCase());
@@ -1612,7 +1612,7 @@ function PublicAspirasi() {
             type="text"
             value={trackInput}
             onChange={e => setTrackInput(e.target.value)}
-            placeholder="Masukkan nomor tiket (misal: ASP-2026-8821)"
+            placeholder="Masukkan nomor tiket aspirasi"
             className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
           />
 
@@ -1659,7 +1659,7 @@ function PublicAspirasi() {
             </div>
           ) : (
             <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 text-slate-400 text-xs">
-              Nomor tiket tidak ditemukan. Pastikan format nomor tiket benar (contoh: ASP-2026-8821).
+              Nomor tiket tidak ditemukan. Pastikan format nomor tiket benar (contoh: ASP-YYYY-0000).
             </div>
           )}
         </div>
@@ -1773,7 +1773,7 @@ function PublicCalendar() {
   const { db, showToast } = useSchool();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua');
-  const [currentMonth, setCurrentMonth] = useState('2026-11');
+  const [currentMonth, setCurrentMonth] = useState(getLocalDateString().slice(0, 7));
 
   const approvedEvents = db.agendas.filter(a => a.status === 'Disetujui');
   const categories = ['Semua', ...new Set(approvedEvents.map(a => a.category))];
@@ -2877,11 +2877,11 @@ function AdminAspirasiModule({ onNavigate }) {
     if (error) { console.error(error); showToast(`Gagal membuat tindak lanjut: ${error.message}`, 'error'); return; }
     const update = await supabase.from('aspirasi').update({ status: 'Dalam Tindak Lanjut' }).eq('id', item.id);
     if (update.error) { console.error(update.error); showToast(`Tindak lanjut tersimpan, tetapi status aspirasi gagal diperbarui: ${update.error.message}`, 'error'); return; }
-    const historyNote = `Dihubungkan ke Tindak Lanjut (TL-${(data.created_at || '').slice(0, 4) || '2026'}-${String(data.id).slice(0, 3).toUpperCase()}).`;
+    const historyNote = `Dihubungkan ke Tindak Lanjut (TL-${(data.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(data.id).slice(0, 3).toUpperCase()}).`;
     const historyResult = await supabase.from('aspirasi_history').insert({ aspirasi_id: item.id, status: 'Dalam Tindak Lanjut', note: historyNote });
     if (historyResult.error) console.error(historyResult.error);
     const newFu = {
-      id: data.id, code: `TL-${(data.created_at || '').slice(0, 4) || '2026'}-${String(data.id).slice(0, 3).toUpperCase()}`,
+      id: data.id, code: `TL-${(data.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(data.id).slice(0, 3).toUpperCase()}`,
       title: data.title, sourceType: 'Aspirasi', sourceRef: item.ticketNumber,
       actionPlan: data.description || '', pic: data.responsible_person || '',
       priority: data.priority || 'Sedang', deadline: data.target_date || '',
@@ -3489,7 +3489,7 @@ function AdminFollowUpModule() {
                 <option>Aspirasi</option>
                 <option>Temuan Internal</option>
               </select>
-              <input type="text" placeholder="Referensi (misal: ASP-2026-8821)" value={form.sourceRef} onChange={e => setForm({ ...form, sourceRef: e.target.value })} className="px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+              <input type="text" placeholder="Referensi (misal: ASP-YYYY-0000)" value={form.sourceRef} onChange={e => setForm({ ...form, sourceRef: e.target.value })} className="px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
             </div>
           )}
 
