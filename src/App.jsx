@@ -47,7 +47,7 @@ function getDateOffset(days = 7) {
   return getLocalDateString(date);
 }
 
-async function uploadSchoolFile(file, folder) {
+async function uploadSchoolFile(file, folder, bucket = 'school-media') {
   if (!supabase) throw new Error('Koneksi database tidak tersedia.');
   if (!file) return null;
   const safeName = file.name
@@ -55,11 +55,26 @@ async function uploadSchoolFile(file, folder) {
     .replace(/^-+|-+$/g, '') || 'file';
   const path = `${folder}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
   const { data, error } = await supabase.storage
-    .from('school-media')
+    .from(bucket)
     .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
   if (error) throw error;
-  const { data: publicData } = supabase.storage.from('school-media').getPublicUrl(data.path);
-  return { path: data.path, url: publicData.publicUrl };
+  const url = bucket === 'school-media'
+    ? supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl
+    : '';
+  return { path: data.path, url };
+}
+
+async function getFollowUpEvidenceUrl(path) {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('data:')) return path;
+  const { data, error } = await supabase.storage
+    .from('follow-up-evidence')
+    .createSignedUrl(path, 3600);
+  if (error) {
+    console.error('Gagal membuat tautan bukti tindak lanjut:', error.message);
+    return '';
+  }
+  return data.signedUrl;
 }
 
 function readFileAsDataUrl(file, callback) {
@@ -326,16 +341,18 @@ function SchoolProvider({ children }) {
         }
 
         if (!followUpResult.error) {
-          updates.followUps = (followUpResult.data || []).map(row => ({
-            id: row.id, code: `TL-${(row.created_at || '').slice(0, 4) || '2026'}-${String(row.id).slice(0, 3).toUpperCase()}`,
+          updates.followUps = await Promise.all((followUpResult.data || []).map(async row => ({
+            id: row.id, code: `TL-${(row.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(row.id).slice(0, 3).toUpperCase()}`,
             title: row.title, sourceType: row.category || 'Umum',
             sourceRef: (updates.aspirasi || []).find(a => a.id === row.linked_aspirasi_id)?.ticketNumber || '',
             actionPlan: row.description || '',
             pic: row.responsible_person || '', priority: row.priority || 'Sedang',
             deadline: row.target_date || '', status: row.status || 'Belum Dimulai',
             evidenceNote: row.evidence_note || '', evidenceFileName: row.evidence_file_name || '',
-            evidenceFileUrl: row.evidence_url || '', timeline: row.timeline || []
-          }));
+            evidenceFilePath: row.evidence_url || '',
+            evidenceFileUrl: await getFollowUpEvidenceUrl(row.evidence_url || ''),
+            timeline: row.timeline || []
+          })));
         } else {
           console.error('Gagal memuat tindak lanjut petugas:', followUpResult.error.message);
         }
@@ -3275,11 +3292,11 @@ function AdminFollowUpModule() {
     const code = `TL-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 899)}`;
     const linkedAspirasi = db.aspirasi.find(a => a.ticketNumber === form.sourceRef);
     const timeline = [{ date: getLocalDateString(), status: form.status, note: 'Rencana tindak lanjut dibuat.' }];
-    let evidenceUrl = form.evidenceFileUrl?.startsWith('http') ? form.evidenceFileUrl : null;
+    let evidencePath = null;
     if (createEvidenceFile) {
       try {
-        const uploaded = await uploadSchoolFile(createEvidenceFile, 'follow-ups');
-        evidenceUrl = uploaded.url;
+        const uploaded = await uploadSchoolFile(createEvidenceFile, 'follow-ups', 'follow-up-evidence');
+        evidencePath = uploaded.path;
       } catch (uploadError) {
         showToast(`Lampiran gagal diunggah: ${uploadError.message}`, 'error');
         return;
@@ -3290,7 +3307,7 @@ function AdminFollowUpModule() {
       category: isGuru ? 'Aspirasi' : form.sourceType, status: form.status,
       priority: form.priority, responsible_person: form.pic || null,
       target_date: form.deadline || null, linked_aspirasi_id: linkedAspirasi?.id || null,
-      evidence_url: evidenceUrl, evidence_note: form.evidenceFileName ? `Lampiran awal: ${form.evidenceFileName}` : '',
+      evidence_url: evidencePath, evidence_note: form.evidenceFileName ? `Lampiran awal: ${form.evidenceFileName}` : '',
       evidence_file_name: form.evidenceFileName || '', timeline
     };
     const { data, error } = await supabase.from('follow_ups').insert(payload).select('*').single();
@@ -3300,13 +3317,14 @@ function AdminFollowUpModule() {
       if (update.error) { console.error(update.error); showToast(`Tindak lanjut tersimpan, tetapi status aspirasi gagal diperbarui: ${update.error.message}`, 'error'); }
       else await supabase.from('aspirasi_history').insert({ aspirasi_id: linkedAspirasi.id, status: 'Dalam Tindak Lanjut', note: `Dihubungkan ke Tindak Lanjut (${code}).` });
     }
+    const evidencePreviewUrl = await getFollowUpEvidenceUrl(data.evidence_url || '');
     const newItem = {
-      id: data.id, code: `TL-${(data.created_at || '').slice(0, 4) || '2026'}-${String(data.id).slice(0, 3).toUpperCase()}`,
+      id: data.id, code: `TL-${(data.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(data.id).slice(0, 3).toUpperCase()}`,
       title: data.title, sourceType: data.category || 'Umum', sourceRef: form.sourceRef,
       actionPlan: data.description || '', pic: data.responsible_person || '',
       priority: data.priority || 'Sedang', deadline: data.target_date || '',
       status: data.status || 'Belum Dimulai', evidenceNote: data.evidence_note || '',
-      evidenceFileName: data.evidence_file_name || '', evidenceFileUrl: data.evidence_url || '', timeline: data.timeline || timeline
+      evidenceFileName: data.evidence_file_name || '', evidenceFilePath: data.evidence_url || '', evidenceFileUrl: evidencePreviewUrl, timeline: data.timeline || timeline
     };
     setDb(prev => ({
       ...prev, followUps: [newItem, ...prev.followUps],
@@ -3336,11 +3354,11 @@ function AdminFollowUpModule() {
       date: today, status: progressUpdate.status,
       note: progressUpdate.note || `Status diperbarui ke ${progressUpdate.status}`
     }];
-    let evidenceUrl = detailModal.evidenceFileUrl || null;
+    let evidencePath = detailModal.evidenceFilePath || null;
     if (progressEvidenceFile) {
       try {
-        const uploaded = await uploadSchoolFile(progressEvidenceFile, 'follow-ups');
-        evidenceUrl = uploaded.url;
+        const uploaded = await uploadSchoolFile(progressEvidenceFile, 'follow-ups', 'follow-up-evidence');
+        evidencePath = uploaded.path;
       } catch (uploadError) {
         showToast(`Bukti gagal diunggah: ${uploadError.message}`, 'error');
         return;
@@ -3349,12 +3367,13 @@ function AdminFollowUpModule() {
     const { data, error } = await supabase.from('follow_ups').update({
       status: progressUpdate.status, evidence_note: progressUpdate.evidenceNote || '',
       evidence_file_name: progressUpdate.evidenceFileName || '',
-      evidence_url: evidenceUrl, timeline
+      evidence_url: evidencePath, timeline
     }).eq('id', detailModal.id).select('*').single();
     if (error) { console.error(error); showToast(`Progres gagal disimpan: ${error.message}`, 'error'); return; }
+    const evidencePreviewUrl = await getFollowUpEvidenceUrl(data.evidence_url || '');
     setDb(prev => ({ ...prev, followUps: prev.followUps.map(f => f.id === detailModal.id ? {
       ...f, status: data.status, evidenceNote: data.evidence_note || '',
-      evidenceFileName: data.evidence_file_name || '', evidenceFileUrl: data.evidence_url || '',
+      evidenceFileName: data.evidence_file_name || '', evidenceFilePath: data.evidence_url || '', evidenceFileUrl: evidencePreviewUrl,
       timeline: data.timeline || timeline
     } : f) }));
     showToast('Progres & bukti tindak lanjut berhasil disimpan ke database!');
