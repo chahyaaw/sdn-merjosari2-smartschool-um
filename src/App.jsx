@@ -1702,43 +1702,75 @@ function PublicAspirasi() {
     return db.aspirasi.find(a => a.ticketNumber.toLowerCase() === trackInput.trim().toLowerCase());
   }, [db.aspirasi, trackInput]);
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.subject.trim() || !form.content.trim()) {
       showToast('Subjek dan isi aspirasi wajib diisi!', 'error');
       return;
     }
+    if (!supabase) {
+      showToast('Layanan aspirasi belum terhubung. Silakan coba beberapa saat lagi.', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
     const now = new Date();
     const ticketNumber = `ASP-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const dateStr = now.toISOString().slice(0, 10);
-    const timeStr = now.toTimeString().slice(0, 5);
-
-    const newItem = {
-      id: `asp-${Date.now()}`,
-      ticketNumber,
-      senderName: form.senderName.trim() || 'Anonim',
-      contact: form.contact.trim() || '-',
+    const payload = {
+      ticket_number: ticketNumber,
+      sender_name: form.senderName.trim() || 'Anonim',
+      contact: form.contact.trim() || null,
       category: form.category,
-      subject: form.subject,
-      content: form.content,
-      attachment: form.attachment,
+      subject: form.subject.trim(),
+      content: form.content.trim(),
+      attachment_url: form.attachment?.trim() || null,
       status: 'Baru Masuk',
       priority: 'Sedang',
-      createdAt: dateStr,
-      publicNote: 'Aspirasi Anda telah masuk dalam antrean verifikasi pihak sekolah.',
-      internalNote: '',
-      linkedFollowUpId: null,
-      history: [
-        { date: `${dateStr} ${timeStr}`, status: 'Baru Masuk', note: 'Aspirasi dikirimkan melalui portal publik.' }
-      ]
+      public_note: 'Aspirasi Anda telah masuk dalam antrean verifikasi pihak sekolah.'
     };
 
-    setDb(prev => ({ ...prev, aspirasi: [newItem, ...prev.aspirasi] }));
-    addNotification('Aspirasi Baru Masuk', `[${ticketNumber}] ${form.subject}`, 'aspirasi');
-    setCreatedTicket(ticketNumber);
-    setTrackInput(ticketNumber);
-    showToast(`Aspirasi terkirim! Nomor Tiket: ${ticketNumber}`);
-    setForm({ senderName: '', contact: '', category: 'Sarana & Prasarana', subject: '', content: '', attachment: '' });
+    try {
+      const { data, error } = await supabase
+        .from('aspirasi')
+        .insert(payload)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      const newItem = {
+        id: data.id,
+        ticketNumber: data.ticket_number,
+        senderName: data.sender_name || 'Anonim',
+        contact: data.contact || '-',
+        category: data.category,
+        subject: data.subject,
+        content: data.content,
+        attachment: data.attachment_url || '',
+        status: data.status || 'Baru Masuk',
+        priority: data.priority || 'Sedang',
+        createdAt: (data.created_at || new Date().toISOString()).slice(0, 10),
+        publicNote: data.public_note || '',
+        internalNote: data.internal_note || '',
+        linkedFollowUpId: null,
+        history: [{ date: new Date(data.created_at || Date.now()).toLocaleString('id-ID'), status: data.status || 'Baru Masuk', note: 'Aspirasi dikirimkan melalui portal publik.' }]
+      };
+
+      setDb(prev => ({ ...prev, aspirasi: [newItem, ...(prev.aspirasi || [])] }));
+      addNotification('Aspirasi Baru Masuk', `[${ticketNumber}] ${form.subject}`, 'aspirasi');
+      setCreatedTicket(ticketNumber);
+      setTrackInput(ticketNumber);
+      showToast(`Aspirasi berhasil dikirim! Nomor Tiket: ${ticketNumber}`);
+      setForm({ senderName: '', contact: '', category: 'Sarana & Prasarana', subject: '', content: '', attachment: '' });
+    } catch (error) {
+      console.error('Gagal mengirim aspirasi ke Supabase:', error);
+      showToast(`Aspirasi gagal dikirim: ${error.message || 'Periksa koneksi dan coba lagi.'}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
