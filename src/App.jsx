@@ -573,11 +573,11 @@ function SchoolProvider({ children }) {
           startTime: String(row.start_time || '').slice(0, 5),
           endTime: String(row.end_time || '').slice(0, 5),
           location: row.location || '', category: row.category || 'Lainnya',
-          color: 'blue', description: row.description || '',
-          status: row.status || 'Disetujui',
+          color: row.color || 'blue', recurrence: row.recurrence || 'Sekali',
+          description: row.description || '', status: row.status || 'Disetujui',
           submitterId: row.submitted_by || '',
           submittedBy: row.submitted_by && currentUser?.id === row.submitted_by ? currentUser.roleLabel : 'Petugas',
-          revisionNote: '', attachment: ''
+          revisionNote: row.revision_note || '', attachment: row.attachment || ''
         }));
       } else {
         console.error('Gagal memuat kalender publik:', agendaResult.error.message);
@@ -659,10 +659,11 @@ function SchoolProvider({ children }) {
           startTime: String(row.start_time || '').slice(0, 5),
           endTime: String(row.end_time || '').slice(0, 5),
           location: row.location || '', category: row.category || 'Lainnya',
-          color: 'blue', description: row.description || '', status: row.status || '',
+          color: row.color || 'blue', recurrence: row.recurrence || 'Sekali',
+          description: row.description || '', status: row.status || '',
           submitterId: row.submitted_by || '',
           submittedBy: row.submitted_by && currentUser?.id === row.submitted_by ? currentUser.roleLabel : 'Petugas',
-          revisionNote: '', attachment: ''
+          revisionNote: row.revision_note || '', attachment: row.attachment || ''
         }));
         if (!allDocumentationResult.error) updates.dokumentasi = (allDocumentationResult.data || []).map(row => ({
           id: row.id, title: row.title, category: row.category || 'Akademik',
@@ -2571,90 +2572,100 @@ function AdminCalendarModule() {
     setModalOpen(true);
   };
 
-  const saveAgenda = (e, asDraft = false) => {
+  const saveAgenda = async (e, asDraft = false) => {
     if (e) e.preventDefault();
     if (!form.title.trim()) {
       showToast('Nama kegiatan wajib diisi!', 'error');
       return;
     }
+    if (!supabase || !currentUser?.id) {
+      showToast('Sesi petugas belum terhubung. Silakan login ulang.', 'error');
+      return;
+    }
 
-    // Kepala Sekolah directly approves; Guru saves as Draft or submits for Kepsek verification
-    const nextStatus = isKepsek
-      ? 'Disetujui'
-      : (asDraft ? 'Draft' : 'Menunggu Persetujuan');
+    const nextStatus = isKepsek ? 'Disetujui' : (asDraft ? 'Draft' : 'Menunggu Persetujuan');
+    const payload = {
+      title: form.title.trim(),
+      event_date: form.date,
+      start_time: form.startTime || null,
+      end_time: form.endTime || null,
+      location: form.location || null,
+      category: form.category || 'Lainnya',
+      description: form.description || null,
+      status: nextStatus,
+      submitted_by: editingAgenda?.submitterId || currentUser.id,
+      color: form.color || 'blue',
+      recurrence: form.recurrence || 'Sekali',
+      attachment: form.attachment || null,
+      revision_note: isGuru && !asDraft ? '' : (editingAgenda?.revisionNote || '')
+    };
 
-    if (editingAgenda) {
-      setDb(prev => ({
-        ...prev,
-        agendas: prev.agendas.map(a =>
-          a.id === editingAgenda.id
-            ? {
-                ...a,
-                ...form,
-                status: nextStatus,
-                revisionNote: isGuru && !asDraft ? '' : a.revisionNote
-              }
-            : a
-        )
-      }));
+    const result = editingAgenda
+      ? await supabase.from('agendas').update(payload).eq('id', editingAgenda.id).select('*').single()
+      : await supabase.from('agendas').insert(payload).select('*').single();
+    if (result.error) {
+      console.error('Gagal menyimpan agenda:', result.error.message);
+      showToast(`Agenda gagal disimpan: ${result.error.message}`, 'error');
+      return;
+    }
 
-      if (isGuru && !asDraft) {
-        addNotification(
-          'Pengajuan / Revisi Agenda Guru',
-          `Guru mengajukan agenda "${form.title}" (${form.date}) untuk diverifikasi.`,
-          'kalender'
-        );
-        showToast('Pengajuan / revisi agenda berhasil dikirim ke Kepala Sekolah!');
-      } else if (asDraft) {
-        showToast('Perubahan disimpan sebagai Draft.');
-      } else {
-        showToast('Agenda sekolah diperbarui & tersinkronisasi ke Kalender Publik!');
-      }
+    const row = result.data;
+    const savedAgenda = {
+      id: row.id, title: row.title, date: row.event_date || '',
+      startTime: String(row.start_time || '').slice(0, 5),
+      endTime: String(row.end_time || '').slice(0, 5),
+      location: row.location || '', category: row.category || 'Lainnya',
+      color: row.color || 'blue', recurrence: row.recurrence || 'Sekali',
+      description: row.description || '', status: row.status || nextStatus,
+      submittedBy: currentUser.roleLabel, submitterId: row.submitted_by || currentUser.id,
+      revisionNote: row.revision_note || '', attachment: row.attachment || ''
+    };
+    setDb(prev => ({
+      ...prev,
+      agendas: editingAgenda
+        ? prev.agendas.map(a => a.id === editingAgenda.id ? savedAgenda : a)
+        : [savedAgenda, ...prev.agendas.filter(a => a.id !== row.id)]
+    }));
+
+    if (isGuru && !asDraft) {
+      addNotification(
+        editingAgenda ? 'Pengajuan / Revisi Agenda Guru' : 'Pengajuan Agenda Kegiatan Baru',
+        `Guru mengajukan agenda "${form.title}" (${form.date}) untuk diverifikasi Kepala Sekolah.`,
+        'kalender'
+      );
+      showToast(editingAgenda ? 'Revisi agenda tersimpan dan dikirim untuk verifikasi.' : 'Agenda berhasil dikirim ke Kepala Sekolah.');
+    } else if (asDraft) {
+      showToast('Draft agenda berhasil disimpan ke database.');
     } else {
-      const newItem = {
-        id: `ag-${Date.now()}`,
-        ...form,
-        status: nextStatus,
-        submittedBy: currentUser.roleLabel,
-        submitterId: currentUser.id,
-        revisionNote: ''
-      };
-      setDb(prev => ({ ...prev, agendas: [newItem, ...prev.agendas] }));
-
-      if (isGuru && !asDraft) {
-        addNotification(
-          'Pengajuan Agenda Kegiatan Baru',
-          `Guru mengajukan kegiatan "${form.title}" pada ${form.date} untuk verifikasi Kepala Sekolah.`,
-          'kalender'
-        );
-        showToast('Pengajuan agenda berhasil dikirim ke Portal Kepala Sekolah!');
-      } else if (asDraft) {
-        showToast('Draft pengajuan agenda berhasil disimpan.');
-      } else {
-        showToast('Agenda baru berhasil ditambahkan & otomatis tampil di Kalender Publik!');
-      }
+      showToast('Agenda berhasil disimpan dan diperbarui di Kalender Publik.');
     }
     setModalOpen(false);
   };
 
-  const handleVerifyDecision = (decision) => {
+  const handleVerifyDecision = async (decision) => {
     if (!verifyModal) return;
     if (decision === 'Perlu Revisi' && !revisionNoteInput.trim()) {
       showToast('Harap tuliskan catatan revisi untuk Guru!', 'error');
       return;
     }
-
+    if (!supabase) {
+      showToast('Koneksi database tidak tersedia.', 'error');
+      return;
+    }
+    const revisionNote = ['Perlu Revisi', 'Ditolak'].includes(decision) ? revisionNoteInput.trim() : '';
+    const { data, error } = await supabase.from('agendas')
+      .update({ status: decision, revision_note: revisionNote })
+      .eq('id', verifyModal.id).select('*').single();
+    if (error) {
+      console.error('Gagal memperbarui status agenda:', error.message);
+      showToast(`Status agenda gagal diperbarui: ${error.message}`, 'error');
+      return;
+    }
     setDb(prev => ({
       ...prev,
-      agendas: prev.agendas.map(a =>
-        a.id === verifyModal.id
-          ? {
-              ...a,
-              status: decision,
-              revisionNote: decision === 'Perlu Revisi' ? revisionNoteInput.trim() : (decision === 'Ditolak' ? revisionNoteInput.trim() : '')
-            }
-          : a
-      )
+      agendas: prev.agendas.map(a => a.id === verifyModal.id
+        ? { ...a, status: data.status, revisionNote: data.revision_note || '' }
+        : a)
     }));
 
     const notifMsg =
@@ -2663,20 +2674,27 @@ function AdminCalendarModule() {
         : decision === 'Perlu Revisi'
         ? `Agenda "${verifyModal.title}" diminta revisi: ${revisionNoteInput}`
         : `Agenda "${verifyModal.title}" ditolak oleh Kepala Sekolah.`;
-
     addNotification(`Status Pengajuan Agenda: ${decision}`, notifMsg, 'kalender');
-    showToast(
-      decision === 'Disetujui'
-        ? 'Agenda disetujui & otomatis terintegrasi ke Kalender Publik!'
-        : `Status pengajuan diperbarui menjadi "${decision}".`
-    );
+    showToast(decision === 'Disetujui'
+      ? 'Agenda disetujui & otomatis terintegrasi ke Kalender Publik!'
+      : `Status pengajuan diperbarui menjadi "${decision}".`);
     setVerifyModal(null);
     setRevisionNoteInput('');
   };
 
-  const deleteAgenda = (id) => {
+  const deleteAgenda = async (id) => {
+    if (!supabase) {
+      showToast('Koneksi database tidak tersedia.', 'error');
+      return;
+    }
+    const { error } = await supabase.from('agendas').delete().eq('id', id);
+    if (error) {
+      console.error('Gagal menghapus agenda:', error.message);
+      showToast(`Agenda gagal dihapus: ${error.message}`, 'error');
+      return;
+    }
     setDb(prev => ({ ...prev, agendas: prev.agendas.filter(a => a.id !== id) }));
-    showToast('Agenda berhasil dihapus.', 'info');
+    showToast('Agenda berhasil dihapus dari database.', 'info');
   };
 
   const handlePrintPDF = () => {
