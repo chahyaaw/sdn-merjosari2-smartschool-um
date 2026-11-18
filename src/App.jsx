@@ -80,6 +80,19 @@ async function getFollowUpEvidenceUrl(path) {
   return data.signedUrl;
 }
 
+async function getAspirasiAttachmentUrl(path) {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('data:')) return path;
+  const { data, error } = await supabase.storage
+    .from('aspirasi-attachments')
+    .createSignedUrl(path, 3600);
+  if (error) {
+    console.warn('Lampiran aspirasi belum memiliki file di penyimpanan:', error.message);
+    return '';
+  }
+  return data?.signedUrl || '';
+}
+
 function readFileAsDataUrl(file, callback) {
   if (!file) return;
   const reader = new FileReader();
@@ -346,16 +359,19 @@ function SchoolProvider({ children }) {
             });
             return groups;
           }, {});
-          updates.aspirasi = (aspirasiResult.data || []).map(row => ({
+          updates.aspirasi = await Promise.all((aspirasiResult.data || []).map(async row => ({
             id: row.id, ticketNumber: row.ticket_number,
             senderName: row.sender_name || 'Anonim', contact: row.contact || '-',
             category: row.category || 'Lainnya', subject: row.subject, content: row.content,
-            attachment: row.attachment_url || '', status: row.status || 'Baru Masuk',
+            attachment: row.attachment_url || '',
+            attachmentUrl: await getAspirasiAttachmentUrl(row.attachment_url || ''),
+            attachmentName: row.attachment_url?.split('/').pop() || '',
+            status: row.status || 'Baru Masuk',
             priority: row.priority || 'Sedang',
             createdAt: (row.created_at || '').slice(0, 10),
             publicNote: row.public_note || '', internalNote: row.internal_note || '',
             linkedFollowUpId: null, history: historyByAspirasi[row.id] || []
-          }));
+          })));
         } else {
           console.error('Gagal memuat aspirasi petugas:', aspirasiResult.error?.message || historyResult.error?.message);
         }
@@ -1438,6 +1454,8 @@ function PublicAspirasi() {
     content: '',
     attachment: ''
   });
+  const [selectedAttachment, setSelectedAttachment] = useState(null);
+  const [attachmentPreview, setAttachmentPreview] = useState('');
   const [createdTicket, setCreatedTicket] = useState(null);
   const [trackInput, setTrackInput] = useState('');
   const [trackedResult, setTrackedResult] = useState(null);
@@ -1509,13 +1527,25 @@ function PublicAspirasi() {
       category: form.category,
       subject: form.subject.trim(),
       content: form.content.trim(),
-      attachment_url: form.attachment?.trim() || null,
+      attachment_url: null,
       status: 'Baru Masuk',
       priority: 'Sedang',
       public_note: 'Aspirasi Anda telah masuk dalam antrean verifikasi pihak sekolah.'
     };
 
     try {
+      if (selectedAttachment) {
+        const safeName = selectedAttachment.name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'lampiran';
+        const attachmentPath = `incoming/${ticketNumber}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+        const { data: uploadedFile, error: uploadError } = await supabase.storage
+          .from('aspirasi-attachments')
+          .upload(attachmentPath, selectedAttachment, {
+            cacheControl: '3600', upsert: false, contentType: selectedAttachment.type
+          });
+        if (uploadError) throw new Error(`Foto aspirasi gagal diunggah: ${uploadError.message}`);
+        payload.attachment_url = uploadedFile.path;
+      }
+
       // Jangan meminta RETURNING/SELECT dari tabel privat: pengunjung publik hanya diberi hak INSERT.
       const { error } = await supabase.from('aspirasi').insert(payload);
       if (error) throw error;
@@ -1528,7 +1558,9 @@ function PublicAspirasi() {
         category: form.category,
         subject: form.subject.trim(),
         content: form.content.trim(),
-        attachment: '',
+        attachment: payload.attachment_url || '',
+        attachmentUrl: '',
+        attachmentName: selectedAttachment?.name || '',
         status: 'Baru Masuk',
         priority: 'Sedang',
         createdAt: dateStr,
@@ -1544,6 +1576,8 @@ function PublicAspirasi() {
       setTrackInput(ticketNumber);
       showToast(`Aspirasi berhasil dikirim! Nomor Tiket: ${ticketNumber}`);
       setForm({ senderName: '', contact: '', category: 'Sarana & Prasarana', subject: '', content: '', attachment: '' });
+      setSelectedAttachment(null);
+      setAttachmentPreview('');
     } catch (error) {
       console.error('Gagal mengirim aspirasi ke Supabase:', error);
       showToast(`Aspirasi gagal dikirim: ${error.message || 'Periksa koneksi dan coba lagi.'}`, 'error');
@@ -1639,9 +1673,32 @@ function PublicAspirasi() {
             <label className="block text-xs font-semibold text-slate-700 mb-1">Lampiran Pendukung (Opsional)</label>
             <input
               type="file"
-              onChange={e => setForm({ ...form, attachment: e.target.files?.[0]?.name || '' })}
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={e => {
+                const file = e.target.files?.[0] || null;
+                if (!file) { setSelectedAttachment(null); setAttachmentPreview(''); return; }
+                if (!file.type.startsWith('image/')) {
+                  showToast('Lampiran aspirasi harus berupa gambar JPG, PNG, WEBP, atau GIF.', 'error');
+                  e.target.value = '';
+                  return;
+                }
+                if (file.size > 10 * 1024 * 1024) {
+                  showToast('Ukuran foto aspirasi maksimal 10 MB.', 'error');
+                  e.target.value = '';
+                  return;
+                }
+                setSelectedAttachment(file);
+                readFileAsDataUrl(file, ({ url }) => setAttachmentPreview(url));
+              }}
               className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
+            <p className="text-[11px] text-slate-500">Format JPG, PNG, WEBP, atau GIF. Maksimal 10 MB.</p>
+            {attachmentPreview && (
+              <div className="space-y-1">
+                <img src={attachmentPreview} alt="Pratinjau lampiran aspirasi" className="w-full max-h-48 object-contain rounded-xl border border-slate-200 bg-slate-50" />
+                <p className="text-xs text-slate-600">{selectedAttachment?.name}</p>
+              </div>
+            )}
           </div>
 
           <button
@@ -3067,6 +3124,22 @@ function AdminAspirasiModule({ onNavigate }) {
               <div className="text-slate-500">Pengirim: {selectedItem.senderName} ({selectedItem.contact}) • Kategori: {selectedItem.category}</div>
               <p className="text-slate-700 pt-1 leading-relaxed">{selectedItem.content}</p>
             </div>
+
+            {selectedItem.attachmentUrl ? (
+              <div className="p-3 rounded-2xl border border-slate-200 bg-white space-y-2">
+                <div className="text-xs font-bold text-slate-700">Foto Lampiran Aspirasi</div>
+                <a href={selectedItem.attachmentUrl} target="_blank" rel="noreferrer" className="block" title="Klik untuk membuka foto ukuran penuh">
+                  <img src={selectedItem.attachmentUrl} alt={selectedItem.attachmentName || 'Lampiran aspirasi'} className="w-full max-h-72 object-contain rounded-xl border border-slate-200 bg-slate-50 hover:opacity-90" />
+                </a>
+                <a href={selectedItem.attachmentUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-700 underline font-semibold">
+                  Buka foto ukuran penuh
+                </a>
+              </div>
+            ) : selectedItem.attachment ? (
+              <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-800">
+                Lampiran tercatat: {selectedItem.attachmentName || selectedItem.attachment.split('/').pop()}. File ini belum tersedia di penyimpanan foto aspirasi.
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
