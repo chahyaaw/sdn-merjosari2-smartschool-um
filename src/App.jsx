@@ -1724,7 +1724,7 @@ function PublicAspirasi() {
                   ))}
                   {trackedEvidenceUrl && trackedItem.followUp.evidenceFileName && (
                     <a href={trackedEvidenceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-semibold text-blue-700 underline">
-                      <ImageIcon className="w-4 h-4" /> Buka foto bukti: {trackedItem.followUp.evidenceFileName}
+                      <ImageIcon className="w-4 h-4" /> Buka lampiran bukti: {trackedItem.followUp.evidenceFileName}
                     </a>
                   )}
                   {trackedEvidenceUrl && /\.(png|jpe?g|gif|webp)(?:\?|$)/i.test(trackedItem.followUp.evidenceFileName || '') && (
@@ -2959,7 +2959,7 @@ function AdminAspirasiModule({ onNavigate }) {
     const historyResult = await supabase.from('aspirasi_history').insert({ aspirasi_id: item.id, status: 'Dalam Tindak Lanjut', note: historyNote });
     if (historyResult.error) console.error(historyResult.error);
     const newFu = {
-      id: data.id, code: `TL-${(data.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(data.id).slice(0, 3).toUpperCase()}`,
+      id: data.id, linkedAspirasiId: item.id, code: `TL-${(data.created_at || '').slice(0, 4) || String(new Date().getFullYear())}-${String(data.id).slice(0, 3).toUpperCase()}`,
       title: data.title, sourceType: 'Aspirasi', sourceRef: item.ticketNumber,
       actionPlan: data.description || '', pic: data.responsible_person || '',
       priority: data.priority || 'Sedang', deadline: data.target_date || '',
@@ -3449,7 +3449,7 @@ function AdminFollowUpModule() {
       }
     }
     const { data, error } = await supabase.from('follow_ups').update({
-      status: progressUpdate.status, evidence_note: progressUpdate.evidenceNote || '',
+      status: progressUpdate.status,
       evidence_file_name: progressUpdate.evidenceFileName || '',
       evidence_url: evidencePath, timeline
     }).eq('id', detailModal.id).select('*').single();
