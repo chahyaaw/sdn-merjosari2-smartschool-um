@@ -18,8 +18,6 @@ import {
 // 1. INITIAL REALISTIC SEED DATA & CONSTANTS (SDN MERJOSARI 2 - MALANG)
 // ============================================================================
 
-const STORAGE_KEY = 'sdn_merjosari_2_sim_v2';
-
 const SCHOOL_INFO = {
   name: 'SDN Merjosari 2',
   npsn: '20534039',
@@ -32,322 +30,38 @@ const SCHOOL_INFO = {
   mapsExternalUrl: 'https://www.google.com/maps/search/?api=1&query=Jl.+Joyo+Utomo+I,+Kec.+Lowokwaru,+Kota+Malang,+Prov.+Jawa+Timur'
 };
 
-const INITIAL_USERS = [
-  {
-    id: 'usr-kepsek',
-    username: 'kepsek',
-    password: '123',
-    role: 'kepala_sekolah',
-    roleLabel: 'Kepala Sekolah',
-    phone: '(0341) 554020',
-    email: 'sdnmerjo_sari02@gmail.com',
-    avatar: 'KS',
-    photoUrl: ''
-  },
-  {
-    id: 'usr-guru',
-    username: 'guru',
-    password: '123',
-    role: 'guru',
-    roleLabel: 'Guru',
-    phone: '(0341) 554020',
-    email: 'sdnmerjo_sari02@gmail.com',
-    avatar: 'GR',
-    photoUrl: ''
-  }
-];
-
-const INITIAL_GUESTBOOK = [
-  {
-    id: 'gb-1',
-    regNumber: 'GT-2026-1041',
-    name: 'Drs. Hendra Gunawan',
-    institution: 'Dinas Pendidikan Kota Malang',
-    phone: '0812-3300-1188',
-    purpose: 'Kunjungan Dinas',
-    destination: 'Bertemu Kepala Sekolah terkait monitoring ANBK',
-    notes: 'Monitoring kesiapan Asesmen Nasional Berbasis Komputer (ANBK)',
-    date: '2026-11-16',
-    time: '09:15',
-    verified: true
-  },
-  {
-    id: 'gb-2',
-    regNumber: 'GT-2026-1042',
-    name: 'Ratna Sari Dewi',
-    institution: 'Wali Murid Kelas III-B',
-    phone: '0857-9088-2211',
-    purpose: 'Wali Murid',
-    destination: 'Konsultasi dengan Wali Kelas III-B',
-    notes: 'Konsultasi perkembangan literasi dan administrasi mutasi alamat',
-    date: '2026-11-17',
-    time: '08:30',
-    verified: false
-  },
-  {
-    id: 'gb-3',
-    regNumber: 'GT-2026-1043',
-    name: 'M. Rizky Pratama',
-    institution: 'Universitas Negeri Malang (UM)',
-    phone: '0813-5566-7788',
-    purpose: 'Penelitian/Magang',
-    destination: 'Pengajuan surat izin observasi kelas IV',
-    notes: 'Pengajuan izin observasi media pembelajaran digital kelas IV',
-    date: '2026-11-17',
-    time: '10:40',
-    verified: false
-  }
-];
-
-const INITIAL_ASPIRASI = [
-  {
-    id: 'asp-1',
-    ticketNumber: 'ASP-2026-8821',
-    senderName: 'Bapak Sutrisno (Wali Murid)',
-    contact: '0812-9988-7766',
-    category: 'Sarana & Prasarana',
-    subject: 'Penambahan Kanopi Area Tunggu Penjemputan Siswa',
-    content: 'Mohon dipertimbangkan penambahan kanopi di area gerbang depan agar siswa tidak kehujanan saat menunggu penjemputan di musim hujan.',
-    attachment: 'foto_area_gerbang.jpg',
-    status: 'Dalam Tindak Lanjut',
-    priority: 'Tinggi',
-    createdAt: '2026-11-10',
-    publicNote: 'Terima kasih atas masukannya. Usulan telah diverifikasi dan masuk dalam rencana pemeliharaan sarana bulan ini.',
-    internalNote: 'Sudah disurvei oleh bagian sarpras, estimasi anggaran diajukan ke komite sekolah.',
-    linkedFollowUpId: 'fu-1',
-    history: [
-      { date: '2026-11-10 08:20', status: 'Baru Masuk', note: 'Aspirasi diterima melalui portal publik.' },
-      { date: '2026-11-11 10:00', status: 'Diverifikasi', note: 'Diverifikasi dan diteruskan ke tindak lanjut sekolah.' },
-      { date: '2026-11-12 14:15', status: 'Dalam Tindak Lanjut', note: 'Dihubungkan ke modul Tindak Lanjut (TL-2026-001).' }
-    ]
-  },
-  {
-    id: 'asp-2',
-    ticketNumber: 'ASP-2026-8822',
-    senderName: 'Ibu Melati Kusuma',
-    contact: 'melati.k@email.com',
-    category: 'Akademik & Pembelajaran',
-    subject: 'Apresiasi Kelas Literasi Pagi & Usulan Klub Coding Anak',
-    content: 'Program baca 15 menit sebelum pelajaran sangat positif. Kami mengusulkan ekstrakurikuler pengenalan logika & coding dasar untuk kelas IV-VI.',
-    attachment: '',
-    status: 'Diverifikasi',
-    priority: 'Sedang',
-    createdAt: '2026-11-14',
-    publicNote: 'Terima kasih atas apresiasi dan ide inovatifnya. Sedang dikaji oleh tim kurikulum dan kesiswaan.',
-    internalNote: 'Cocok disinergikan dengan program Lab Komputer semester genap.',
-    linkedFollowUpId: 'fu-2',
-    history: [
-      { date: '2026-11-14 13:10', status: 'Baru Masuk', note: 'Aspirasi dikirimkan melalui formulir online.' },
-      { date: '2026-11-15 09:30', status: 'Diverifikasi', note: 'Diterima dan dijadwalkan pembahasan kurikulum.' }
-    ]
-  },
-  {
-    id: 'asp-3',
-    ticketNumber: 'ASP-2026-8823',
-    senderName: 'Anonim',
-    contact: '-',
-    category: 'Lainnya',
-    subject: 'Perbaikan Keran Air Wastafel Dekat Kelas II',
-    content: 'Keran wastafel nomor 2 di depan kelas II agak bocor sehingga air terus menetes.',
-    attachment: '',
-    status: 'Selesai',
-    priority: 'Sedang',
-    createdAt: '2026-11-05',
-    publicNote: 'Keran wastafel telah diganti dengan unit baru oleh petugas kebersihan & sarpras pada 6 November 2026.',
-    internalNote: 'Selesai diganti, sudah dicek berfungsi normal.',
-    linkedFollowUpId: null,
-    history: [
-      { date: '2026-11-05 11:00', status: 'Baru Masuk', note: 'Laporan diterima.' },
-      { date: '2026-11-06 08:45', status: 'Selesai', note: 'Perbaikan selesai dilakukan.' }
-    ]
-  }
-];
-
-const INITIAL_DOKUMENTASI = [
-  {
-    id: 'dok-1',
-    title: 'Upacara Peringatan Hari Pahlawan & Lomba Kostum Pejuang',
-    category: 'Kesiswaan',
-    date: '2026-11-10',
-    year: '2026',
-    status: 'Terbit',
-    mediaType: 'Foto',
-    fileName: 'upacara_hari_pahlawan_2026.jpg',
-    fileUrl: '',
-    description: 'Seluruh siswa kelas I hingga VI mengikuti upacara bendera dengan khidmat dilanjutkan parade busana pahlawan nasional untuk menanamkan nilai patriotisme sejak dini.'
-  },
-  {
-    id: 'dok-2',
-    title: 'Workshop Implementasi Pembelajaran Interaktif Berbasis TIK',
-    category: 'Akademik',
-    date: '2026-10-24',
-    year: '2026',
-    status: 'Terbit',
-    mediaType: 'Foto',
-    fileName: 'workshop_tik_guru.jpg',
-    fileUrl: '',
-    description: 'Pelatihan internal guru-guru SDN Merjosari 2 dalam memanfaatkan papan interaktif dan asesmen digital guna meningkatkan keterlibatan siswa di kelas.'
-  },
-  {
-    id: 'dok-3',
-    title: 'Gerakan Sekolah Sehat & Senam Pagi Bersama',
-    category: 'Ekstrakurikuler',
-    date: '2026-11-01',
-    year: '2026',
-    status: 'Terbit',
-    mediaType: 'Video',
-    fileName: 'senam_jumat_sehat.mp4',
-    fileUrl: '',
-    description: 'Kegiatan rutin Jumat Sehat meliputi senam bersama, pemeriksaan kebersihan kuku dan gigi oleh tim UKS cilik, serta sarapan bergizi bersama.'
-  }
-];
-
-const INITIAL_PENGUMUMAN = [
-  {
-    id: 'pg-1',
-    title: 'Penerimaan Bantuan 250 Eksemplar Buku Pengayaan Perpustakaan Sekolah',
-    date: '2026-11-04',
-    category: 'Pengumuman Sekolah',
-    visibility: 'Publik',
-    photoUrl: '',
-    photoName: 'penyerahan_buku_perpustakaan.jpg',
-    content: 'SDN Merjosari 2 telah menerima 250 eksemplar buku bacaan literasi anak hasil kolaborasi program Gerakan Literasi Sekolah Kota Malang. Seluruh buku telah dicatat pada katalog perpustakaan dan mulai dapat dipinjam oleh seluruh siswa kelas I sampai VI pada jam istirahat maupun jam kunjung literasi.'
-  },
-  {
-    id: 'pg-2',
-    title: 'Jadwal Pelaksanaan Sumatif Akhir Semester (SAS) Ganjil Tahun Ajaran 2026/2027',
-    date: '2026-11-12',
-    category: 'Informasi Akademik',
-    visibility: 'Publik',
-    photoUrl: '',
-    photoName: 'rapat_persiapan_sas.jpg',
-    content: 'Diberitahukan kepada seluruh orang tua/wali murid bahwa pelaksanaan Sumatif Akhir Semester (SAS) Ganjil akan dilaksanakan mulai tanggal 1 Desember hingga 8 Desember 2026. Mohon pendampingan belajar di rumah serta menjaga kesehatan putra-putri selama masa ujian berlangsung.'
-  },
-  {
-    id: 'pg-3',
-    title: 'Himbauan Gerakan Jumat Bersih & Bawa Botol Minum Tumbler',
-    date: '2026-11-15',
-    category: 'Kegiatan Sekolah',
-    visibility: 'Publik',
-    photoUrl: '',
-    photoName: 'gerakan_jumat_bersih.jpg',
-    content: 'Dalam rangka mendukung budaya sekolah sehat dan pengurangan sampah plastik, seluruh siswa dihimbau membawa botol minum (tumbler) dan tempat bekal masing-masing setiap hari sekolah.'
-  }
-];
-
-const INITIAL_AGENDAS = [
-  {
-    id: 'ag-1',
-    title: 'Rapat Dinas Evaluasi Kurikulum Merdeka',
-    date: '2026-11-18',
-    startTime: '13:00',
-    endTime: '15:00',
-    location: 'Ruang Guru',
-    category: 'Rapat & Dinas',
-    color: 'blue',
-    priority: 'Tinggi',
-    recurrence: 'Sekali',
-    description: 'Evaluasi capaian pembelajaran tengah semester dan persiapan rapor digital.',
-    status: 'Disetujui',
-    submittedBy: 'Kepala Sekolah',
-    submitterId: 'usr-kepsek',
-    revisionNote: '',
-    attachment: 'undangan_rapat_nov.pdf'
-  },
-  {
-    id: 'ag-2',
-    title: 'Outing Class Edukasi Lingkungan & Urban Farming',
-    date: '2026-11-21',
-    startTime: '08:00',
-    endTime: '11:30',
-    location: 'Taman Edukasi Merjosari',
-    category: 'Akademik',
-    color: 'emerald',
-    description: 'Praktik langsung pembelajaran IPAS kelas V mengenai ekosistem dan hidroponik.',
-    status: 'Disetujui',
-    submittedBy: 'Guru',
-    submitterId: 'usr-guru',
-    revisionNote: '',
-    attachment: 'proposal_outing_kelas5.pdf'
-  },
-  {
-    id: 'ag-3',
-    title: 'Lomba Cerdas Cermat Antar Kelas (Class Meeting)',
-    date: '2026-12-10',
-    startTime: '08:00',
-    endTime: '12:00',
-    location: 'Aula & Lapangan Utama',
-    category: 'Kesiswaan',
-    color: 'amber',
-    description: 'Kegiatan pasca ujian untuk mengasah sportivitas, literasi, dan kerja sama tim siswa.',
-    status: 'Menunggu Persetujuan',
-    submittedBy: 'Guru',
-    submitterId: 'usr-guru',
-    revisionNote: '',
-    attachment: 'juknis_lomba_desember.pdf'
-  },
-  {
-    id: 'ag-4',
-    title: 'Sumatif Akhir Semester (SAS) Ganjil 2026/2027',
-    date: '2026-12-01',
-    startTime: '07:30',
-    endTime: '11:00',
-    location: 'Seluruh Ruang Kelas',
-    category: 'Akademik',
-    color: 'purple',
-    description: 'Pelaksanaan penilaian akhir semester ganjil untuk kelas I sampai VI.',
-    status: 'Disetujui',
-    submittedBy: 'Kepala Sekolah',
-    submitterId: 'usr-kepsek',
-    revisionNote: '',
-    attachment: 'jadwal_sas_2026.pdf'
-  }
-];
-
-const INITIAL_FOLLOWUPS = [
-  {
-    id: 'fu-1',
-    code: 'TL-2026-001',
-    title: 'Pemasangan Kanopi Area Tunggu Gerbang Depan',
-    sourceType: 'Aspirasi',
-    sourceRef: 'ASP-2026-8821',
-    actionPlan: 'Melakukan pengukuran ulang area gerbang, meminta penawaran vendor kanopi baja ringan, dan mengoordinasikan pemasangan.',
-    pic: 'Kepala Sekolah',
-    priority: 'Tinggi',
-    deadline: '2026-11-28',
-    status: 'Sedang Berlangsung',
-    evidenceNote: 'Foto pengukuran lahan gerbang depan telah diunggah.',
-    evidenceFileName: 'pengukuran_gerbang.jpg',
-    evidenceFileUrl: '',
-    timeline: [
-      { date: '2026-11-12', status: 'Belum Dimulai', note: 'Tindak lanjut dibuat dari tiket aspirasi ASP-2026-8821.' },
-      { date: '2026-11-15', status: 'Sedang Berlangsung', note: 'Survei teknis dan penyusunan RAB selesai.' }
-    ]
-  },
-  {
-    id: 'fu-2',
-    code: 'TL-2026-002',
-    title: 'Kajian Program Ekstrakurikuler Literasi & Coding Dasar',
-    sourceType: 'Aspirasi',
-    sourceRef: 'ASP-2026-8822',
-    actionPlan: 'Menyusun silabus pengenalan logika & coding dasar menggunakan perangkat Chromebook sekolah untuk kelas IV-VI.',
-    pic: 'Guru',
-    priority: 'Sedang',
-    deadline: '2026-11-25',
-    status: 'Menunggu Verifikasi',
-    evidenceNote: 'Draf silabus dan foto kesiapan ruang lab komputer telah dilampirkan.',
-    evidenceFileName: 'silabus_coding_dasar.pdf',
-    evidenceFileUrl: '',
-    timeline: [
-      { date: '2026-11-15', status: 'Sedang Berlangsung', note: 'Penyusunan modul pengenalan logika anak.' },
-      { date: '2026-11-17', status: 'Menunggu Verifikasi', note: 'Draf modul selesai disusun oleh Guru.' }
-    ]
-  }
-];
-
 // ============================================================================
-// 2. FILE UPLOAD HELPER (CONVERT FILE TO DATAURL FOR PERSISTENT PREVIEW)
+// 2. DATE AND FILE HELPERS
 // ============================================================================
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDateOffset(days = 7) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return getLocalDateString(date);
+}
+
+async function uploadSchoolFile(file, folder) {
+  if (!supabase) throw new Error('Koneksi database tidak tersedia.');
+  if (!file) return null;
+  const safeName = file.name.normalize('NFKD')
+    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'file';
+  const path = `${folder}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+  const { data, error } = await supabase.storage
+    .from('school-media')
+    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+  if (error) throw error;
+  const { data: publicData } = supabase.storage.from('school-media').getPublicUrl(data.path);
+  return { path: data.path, url: publicData.publicUrl };
+}
 
 function readFileAsDataUrl(file, callback) {
   if (!file) return;
@@ -429,7 +143,7 @@ function downloadCalendarPDF(agendas, monthFilter = '') {
         </tbody>
       </table>
       <div class="footer">
-        <p>Malang, ${new Date().toISOString().slice(0, 10)}</p>
+        <p>Malang, ${getLocalDateString()}</p>
         <p style="margin-top:48px;font-weight:bold;">Kepala ${SCHOOL_INFO.name}</p>
       </div>
       <script>
@@ -448,42 +162,14 @@ function downloadCalendarPDF(agendas, monthFilter = '') {
 const SchoolContext = createContext(null);
 
 function SchoolProvider({ children }) {
-  const loadState = () => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Private guestbook records are never restored from browser storage.
-        return { ...parsed, guestbook: [] };
-      }
-    } catch (e) {
-      console.error('Failed loading state:', e);
-    }
-    return {
-      users: INITIAL_USERS,
-      guestbook: [],
-      aspirasi: INITIAL_ASPIRASI,
-      dokumentasi: INITIAL_DOKUMENTASI,
-      pengumuman: INITIAL_PENGUMUMAN,
-      agendas: INITIAL_AGENDAS,
-      followUps: INITIAL_FOLLOWUPS,
-      notifications: []
-    };
-  };
-
-  const [db, setDb] = useState(loadState);
+  // Supabase is the single source of truth; never cache private school records in the browser.
+  const [db, setDb] = useState({
+    users: [], guestbook: [], aspirasi: [], dokumentasi: [],
+    pengumuman: [], agendas: [], followUps: [], notifications: []
+  });
   const [currentUser, setCurrentUser] = useState(null);
   const [viewMode, setViewMode] = useState('public'); // 'public' | 'admin'
   const [toast, setToast] = useState(null);
-
-  useEffect(() => {
-    try {
-      // Do not cache personal visitor records in localStorage.
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...db, guestbook: [] }));
-    } catch (e) {
-      console.error('Failed saving state:', e);
-    }
-  }, [db]);
 
   // Restore signed-in staff from Supabase Auth and trust only the database role.
   useEffect(() => {
@@ -743,29 +429,13 @@ function SchoolProvider({ children }) {
     }));
   };
 
-  const resetDemoData = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setDb({
-      users: INITIAL_USERS,
-      guestbook: INITIAL_GUESTBOOK,
-      aspirasi: INITIAL_ASPIRASI,
-      dokumentasi: INITIAL_DOKUMENTASI,
-      pengumuman: INITIAL_PENGUMUMAN,
-      agendas: INITIAL_AGENDAS,
-      followUps: INITIAL_FOLLOWUPS,
-      notifications: []
-    });
-    showToast('Data simulasi berhasil dikembalikan ke pengaturan awal!', 'info');
-  };
-
   return (
     <SchoolContext.Provider value={{
       db, setDb,
       currentUser, setCurrentUser,
       viewMode, setViewMode,
       toast, showToast,
-      addNotification,
-      resetDemoData
+      addNotification
     }}>
       {children}
     </SchoolContext.Provider>
@@ -2101,7 +1771,7 @@ function PublicCalendar() {
   const [yearNum, monthNum] = currentMonth.split('-').map(Number);
   const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
   const firstDayIdx = new Date(yearNum, monthNum - 1, 1).getDay();
-  const todayStr = '2026-11-17';
+  const todayStr = getLocalDateString();
 
   const colorMap = {
     blue: 'bg-blue-100 text-blue-800 border-blue-300',
@@ -2543,8 +2213,8 @@ function AdminCalendarModule() {
 
   const [form, setForm] = useState({
     title: '',
-    date: '2026-11-25',
-    endDate: '2026-11-25',
+    date: getLocalDateString(),
+    endDate: getLocalDateString(),
     startTime: '08:00',
     endTime: '10:00',
     location: 'Aula Utama',
@@ -2586,8 +2256,8 @@ function AdminCalendarModule() {
     setEditingAgenda(null);
     setForm({
       title: '',
-      date: '2026-11-25',
-      endDate: '2026-11-25',
+      date: getLocalDateString(),
+      endDate: getLocalDateString(),
       startTime: '08:00',
       endTime: '10:00',
       location: 'Aula Utama',
@@ -3180,12 +2850,12 @@ function AdminAspirasiModule({ onNavigate }) {
       onNavigate('tindaklanjut'); return;
     }
     if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateString();
     const timeline = [{ date: today, status: 'Belum Dimulai', note: `Dibuat otomatis dari tiket aspirasi ${item.ticketNumber}.` }];
     const { data, error } = await supabase.from('follow_ups').insert({
       title: `Tindak Lanjut: ${item.subject}`, description: item.content,
       category: 'Aspirasi', responsible_person: 'Kepala Sekolah',
-      priority: item.priority || 'Sedang', target_date: '2026-11-30',
+      priority: item.priority || 'Sedang', target_date: getDateOffset(7),
       status: 'Belum Dimulai', linked_aspirasi_id: item.id, timeline
     }).select('*').single();
     if (error) { console.error(error); showToast(`Gagal membuat tindak lanjut: ${error.message}`, 'error'); return; }
@@ -3551,6 +3221,8 @@ function AdminFollowUpModule() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModal, setDetailModal] = useState(null);
+  const [createEvidenceFile, setCreateEvidenceFile] = useState(null);
+  const [progressEvidenceFile, setProgressEvidenceFile] = useState(null);
 
   const [form, setForm] = useState({
     title: '',
@@ -3559,7 +3231,7 @@ function AdminFollowUpModule() {
     actionPlan: '',
     pic: currentUser.roleLabel,
     priority: 'Sedang',
-    deadline: '2026-11-30',
+    deadline: getDateOffset(7),
     status: 'Belum Dimulai',
     evidenceFileName: '',
     evidenceFileUrl: ''
@@ -3581,6 +3253,7 @@ function AdminFollowUpModule() {
   const handleFileUploadCreate = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setCreateEvidenceFile(file);
     readFileAsDataUrl(file, ({ name, url }) => {
       setForm(prev => ({ ...prev, evidenceFileName: name, evidenceFileUrl: url }));
       showToast(`Berkas "${name}" siap diunggah!`);
@@ -3590,6 +3263,7 @@ function AdminFollowUpModule() {
   const handleFileUploadUpdate = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setProgressEvidenceFile(file);
     readFileAsDataUrl(file, ({ name, url }) => {
       setProgressUpdate(prev => ({ ...prev, evidenceFileName: name, evidenceFileUrl: url }));
       showToast(`Foto/File "${name}" berhasil dilampirkan!`);
@@ -3599,15 +3273,25 @@ function AdminFollowUpModule() {
   const createFollowUp = async (e) => {
     e.preventDefault();
     if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
-    const code = `TL-2026-${Math.floor(100 + Math.random() * 899)}`;
+    const code = `TL-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 899)}`;
     const linkedAspirasi = db.aspirasi.find(a => a.ticketNumber === form.sourceRef);
-    const timeline = [{ date: new Date().toISOString().slice(0, 10), status: form.status, note: 'Rencana tindak lanjut dibuat.' }];
+    const timeline = [{ date: getLocalDateString(), status: form.status, note: 'Rencana tindak lanjut dibuat.' }];
+    let evidenceUrl = form.evidenceFileUrl?.startsWith('http') ? form.evidenceFileUrl : null;
+    if (createEvidenceFile) {
+      try {
+        const uploaded = await uploadSchoolFile(createEvidenceFile, 'follow-ups');
+        evidenceUrl = uploaded.url;
+      } catch (uploadError) {
+        showToast(`Lampiran gagal diunggah: ${uploadError.message}`, 'error');
+        return;
+      }
+    }
     const payload = {
       title: form.title, description: form.actionPlan || null,
       category: isGuru ? 'Aspirasi' : form.sourceType, status: form.status,
       priority: form.priority, responsible_person: form.pic || null,
       target_date: form.deadline || null, linked_aspirasi_id: linkedAspirasi?.id || null,
-      evidence_url: form.evidenceFileUrl || null, evidence_note: form.evidenceFileName ? `Lampiran awal: ${form.evidenceFileName}` : '',
+      evidence_url: evidenceUrl, evidence_note: form.evidenceFileName ? `Lampiran awal: ${form.evidenceFileName}` : '',
       evidence_file_name: form.evidenceFileName || '', timeline
     };
     const { data, error } = await supabase.from('follow_ups').insert(payload).select('*').single();
@@ -3630,10 +3314,12 @@ function AdminFollowUpModule() {
       aspirasi: linkedAspirasi ? prev.aspirasi.map(a => a.id === linkedAspirasi.id ? { ...a, status: 'Dalam Tindak Lanjut' } : a) : prev.aspirasi
     }));
     showToast(`Tindak lanjut ${code} berhasil dibuat dan disimpan!`);
+    setCreateEvidenceFile(null);
     setModalOpen(false);
   };
 
   const openDetail = (fu) => {
+    setProgressEvidenceFile(null);
     setDetailModal(fu);
     setProgressUpdate({
       status: fu.status,
@@ -3646,15 +3332,25 @@ function AdminFollowUpModule() {
 
   const saveProgress = async () => {
     if (!supabase || !detailModal) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateString();
     const timeline = [...(detailModal.timeline || []), {
       date: today, status: progressUpdate.status,
       note: progressUpdate.note || `Status diperbarui ke ${progressUpdate.status}`
     }];
+    let evidenceUrl = detailModal.evidenceFileUrl || null;
+    if (progressEvidenceFile) {
+      try {
+        const uploaded = await uploadSchoolFile(progressEvidenceFile, 'follow-ups');
+        evidenceUrl = uploaded.url;
+      } catch (uploadError) {
+        showToast(`Bukti gagal diunggah: ${uploadError.message}`, 'error');
+        return;
+      }
+    }
     const { data, error } = await supabase.from('follow_ups').update({
       status: progressUpdate.status, evidence_note: progressUpdate.evidenceNote || '',
       evidence_file_name: progressUpdate.evidenceFileName || '',
-      evidence_url: progressUpdate.evidenceFileUrl || null, timeline
+      evidence_url: evidenceUrl, timeline
     }).eq('id', detailModal.id).select('*').single();
     if (error) { console.error(error); showToast(`Progres gagal disimpan: ${error.message}`, 'error'); return; }
     setDb(prev => ({ ...prev, followUps: prev.followUps.map(f => f.id === detailModal.id ? {
@@ -3663,6 +3359,7 @@ function AdminFollowUpModule() {
       timeline: data.timeline || timeline
     } : f) }));
     showToast('Progres & bukti tindak lanjut berhasil disimpan ke database!');
+    setProgressEvidenceFile(null);
     setDetailModal(null);
   };
 
@@ -3681,6 +3378,7 @@ function AdminFollowUpModule() {
         </div>
         <button
           onClick={() => {
+            setCreateEvidenceFile(null);
             setForm({
               title: '',
               sourceType: 'Aspirasi',
@@ -3688,7 +3386,7 @@ function AdminFollowUpModule() {
               actionPlan: '',
               pic: currentUser.roleLabel,
               priority: 'Sedang',
-              deadline: '2026-11-30',
+              deadline: getDateOffset(7),
               status: 'Belum Dimulai',
               evidenceFileName: '',
               evidenceFileUrl: ''
@@ -3716,7 +3414,7 @@ function AdminFollowUpModule() {
               <p className="text-xs text-slate-600 line-clamp-2">{fu.actionPlan}</p>
 
               {/* Thumbnail Preview if image uploaded */}
-              {fu.evidenceFileUrl && fu.evidenceFileUrl.startsWith('data:image') && (
+              {fu.evidenceFileUrl && (fu.evidenceFileUrl.startsWith('data:image') || /\\.(png|jpe?g|gif|webp)(?:\\?|$)/i.test(fu.evidenceFileUrl)) && (
                 <img src={fu.evidenceFileUrl} alt="Bukti Tindak Lanjut" className="w-full h-28 object-cover rounded-xl border border-slate-200" />
               )}
               {fu.evidenceFileName && (
@@ -3850,7 +3548,7 @@ function AdminFollowUpModule() {
                   onChange={handleFileUploadUpdate}
                   className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                 />
-                {progressUpdate.evidenceFileUrl && progressUpdate.evidenceFileUrl.startsWith('data:image') && (
+                {progressUpdate.evidenceFileUrl && (progressUpdate.evidenceFileUrl.startsWith('data:image') || /\\.(png|jpe?g|gif|webp)(?:\\?|$)/i.test(progressUpdate.evidenceFileUrl)) && (
                   <img src={progressUpdate.evidenceFileUrl} alt="Preview Bukti" className="w-full max-h-44 object-cover rounded-xl border border-slate-200 mt-2" />
                 )}
                 {progressUpdate.evidenceFileName && (
@@ -3874,10 +3572,11 @@ function AdminDocumentationModule() {
   const { db, setDb, showToast } = useSchool();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [form, setForm] = useState({
     title: '',
     category: 'Akademik',
-    date: '2026-11-17',
+    date: getLocalDateString(),
     mediaType: 'Foto',
     status: 'Terbit',
     description: '',
@@ -3887,10 +3586,11 @@ function AdminDocumentationModule() {
 
   const openModal = (item = null) => {
     setEditing(item);
+    setSelectedFile(null);
     setForm(item || {
       title: '',
       category: 'Akademik',
-      date: '2026-11-17',
+      date: getLocalDateString(),
       mediaType: 'Foto',
       status: 'Terbit',
       description: '',
@@ -3903,30 +3603,65 @@ function AdminDocumentationModule() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedFile(file);
     readFileAsDataUrl(file, ({ name, type, url }) => {
       const detectedType = type.startsWith('video/') ? 'Video' : 'Foto';
       setForm(prev => ({ ...prev, fileName: name, fileUrl: url, mediaType: detectedType }));
-      showToast(`File "${name}" berhasil dipilih!`);
+      showToast(`File "${name}" siap diunggah saat disimpan!`);
     });
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    const year = form.date.slice(0, 4);
-    if (editing) {
-      setDb(prev => ({ ...prev, dokumentasi: prev.dokumentasi.map(d => d.id === editing.id ? { ...d, ...form, year } : d) }));
-      showToast('Dokumentasi diperbarui!');
-    } else {
-      const newDoc = { id: `dok-${Date.now()}`, ...form, year };
-      setDb(prev => ({ ...prev, dokumentasi: [newDoc, ...prev.dokumentasi] }));
-      showToast(form.status === 'Terbit' ? 'Dokumentasi diterbitkan ke Website Publik!' : 'Dokumentasi disimpan.');
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+    try {
+      let fileUrl = form.fileUrl || '';
+      let fileName = form.fileName || '';
+      let mediaType = form.mediaType || 'Foto';
+      if (selectedFile) {
+        const uploaded = await uploadSchoolFile(selectedFile, 'documentation');
+        fileUrl = uploaded.url;
+        fileName = selectedFile.name;
+        mediaType = selectedFile.type.startsWith('video/') ? 'Video' : 'Foto';
+      }
+      const payload = {
+        title: form.title.trim(), category: form.category, event_date: form.date,
+        media_type: mediaType, file_name: fileName || null, file_url: fileUrl || null,
+        description: form.description.trim(), status: form.status
+      };
+      const result = editing
+        ? await supabase.from('documentation').update(payload).eq('id', editing.id).select('*').single()
+        : await supabase.from('documentation').insert(payload).select('*').single();
+      if (result.error) throw result.error;
+      const row = result.data;
+      const savedDoc = {
+        id: row.id, title: row.title, category: row.category || 'Akademik',
+        date: row.event_date || '', year: (row.event_date || '').slice(0, 4),
+        status: row.status || 'Draft', mediaType: row.media_type || 'Foto',
+        fileName: row.file_name || '', fileUrl: row.file_url || '',
+        description: row.description || ''
+      };
+      setDb(prev => ({
+        ...prev,
+        dokumentasi: editing
+          ? prev.dokumentasi.map(item => item.id === editing.id ? savedDoc : item)
+          : [savedDoc, ...prev.dokumentasi.filter(item => item.id !== savedDoc.id)]
+      }));
+      setSelectedFile(null);
+      setModalOpen(false);
+      showToast(row.status === 'Terbit' ? 'Dokumentasi tersimpan dan diterbitkan.' : 'Dokumentasi tersimpan sebagai draft.');
+    } catch (error) {
+      console.error('Gagal menyimpan dokumentasi:', error);
+      showToast(`Dokumentasi gagal disimpan: ${error.message}`, 'error');
     }
-    setModalOpen(false);
   };
 
-  const handleDelete = (id) => {
-    setDb(prev => ({ ...prev, dokumentasi: prev.dokumentasi.filter(d => d.id !== id) }));
-    showToast('Dokumentasi dihapus.', 'info');
+  const handleDelete = async (id) => {
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+    const { error } = await supabase.from('documentation').delete().eq('id', id);
+    if (error) { showToast(`Dokumentasi gagal dihapus: ${error.message}`, 'error'); return; }
+    setDb(prev => ({ ...prev, dokumentasi: prev.dokumentasi.filter(item => item.id !== id) }));
+    showToast('Dokumentasi dihapus dari database.', 'info');
   };
 
   return (
@@ -4033,9 +3768,10 @@ function AdminPengumumanModule() {
   const { db, setDb, showToast } = useSchool();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [form, setForm] = useState({
     title: '',
-    date: '2026-11-17',
+    date: getLocalDateString(),
     category: 'Pengumuman Sekolah',
     visibility: 'Publik',
     photoUrl: '',
@@ -4045,9 +3781,10 @@ function AdminPengumumanModule() {
 
   const openModal = (item = null) => {
     setEditing(item);
+    setSelectedPhoto(null);
     setForm(item || {
       title: '',
-      date: '2026-11-17',
+      date: getLocalDateString(),
       category: 'Pengumuman Sekolah',
       visibility: 'Publik',
       photoUrl: '',
@@ -4060,28 +3797,61 @@ function AdminPengumumanModule() {
   const handlePhotoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedPhoto(file);
     readFileAsDataUrl(file, ({ name, url }) => {
       setForm(prev => ({ ...prev, photoName: name, photoUrl: url }));
-      showToast(`Foto "${name}" siap diunggah!`);
+      showToast(`Foto "${name}" siap diunggah saat disimpan!`);
     });
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    if (editing) {
-      setDb(prev => ({ ...prev, pengumuman: prev.pengumuman.map(p => p.id === editing.id ? { ...p, ...form } : p) }));
-      showToast('Pengumuman / Berita diperbarui!');
-    } else {
-      const newItem = { id: `pg-${Date.now()}`, ...form };
-      setDb(prev => ({ ...prev, pengumuman: [newItem, ...prev.pengumuman] }));
-      showToast('Pengumuman / Berita berhasil diterbitkan!');
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+    try {
+      let photoUrl = form.photoUrl || '';
+      let photoName = form.photoName || '';
+      if (selectedPhoto) {
+        const uploaded = await uploadSchoolFile(selectedPhoto, 'announcements');
+        photoUrl = uploaded.url;
+        photoName = selectedPhoto.name;
+      }
+      const payload = {
+        title: form.title.trim(), announcement_date: form.date,
+        category: form.category, visibility: form.visibility,
+        photo_url: photoUrl || null, photo_name: photoName || null,
+        content: form.content.trim()
+      };
+      const result = editing
+        ? await supabase.from('announcements').update(payload).eq('id', editing.id).select('*').single()
+        : await supabase.from('announcements').insert(payload).select('*').single();
+      if (result.error) throw result.error;
+      const row = result.data;
+      const savedItem = {
+        id: row.id, title: row.title, date: row.announcement_date || '',
+        category: row.category || 'Pengumuman Sekolah', visibility: row.visibility || 'Publik',
+        photoUrl: row.photo_url || '', photoName: row.photo_name || '', content: row.content || ''
+      };
+      setDb(prev => ({
+        ...prev,
+        pengumuman: editing
+          ? prev.pengumuman.map(item => item.id === editing.id ? savedItem : item)
+          : [savedItem, ...prev.pengumuman.filter(item => item.id !== savedItem.id)]
+      }));
+      setSelectedPhoto(null);
+      setModalOpen(false);
+      showToast(row.visibility === 'Publik' ? 'Pengumuman tersimpan dan diterbitkan.' : 'Pengumuman tersimpan sebagai draft.');
+    } catch (error) {
+      console.error('Gagal menyimpan pengumuman:', error);
+      showToast(`Pengumuman gagal disimpan: ${error.message}`, 'error');
     }
-    setModalOpen(false);
   };
 
-  const handleDelete = (id) => {
-    setDb(prev => ({ ...prev, pengumuman: prev.pengumuman.filter(p => p.id !== id) }));
-    showToast('Pengumuman dihapus.', 'info');
+  const handleDelete = async (id) => {
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    if (error) { showToast(`Pengumuman gagal dihapus: ${error.message}`, 'error'); return; }
+    setDb(prev => ({ ...prev, pengumuman: prev.pengumuman.filter(item => item.id !== id) }));
+    showToast('Pengumuman dihapus dari database.', 'info');
   };
 
   return (
@@ -4179,93 +3949,69 @@ function AdminPengumumanModule() {
 
 // --- 8H. PROFIL AKUN (TANPA LOG AKTIVITAS + UPLOAD FOTO PROFIL) ---
 function AdminProfileModule() {
-  const { db, setDb, currentUser, setCurrentUser, showToast, resetDemoData } = useSchool();
+  const { currentUser, setCurrentUser, showToast } = useSchool();
   const [profileForm, setProfileForm] = useState({
-    phone: currentUser.phone,
-    email: currentUser.email,
-    newPassword: '',
-    photoUrl: currentUser.photoUrl || ''
+    phone: currentUser.phone || '',
+    newPassword: ''
   });
+  const [saving, setSaving] = useState(false);
 
-  const handlePhotoUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    readFileAsDataUrl(file, ({ url }) => {
-      setProfileForm(prev => ({ ...prev, photoUrl: url }));
-      const updatedUser = { ...currentUser, photoUrl: url };
-      setCurrentUser(updatedUser);
-      setDb(prev => ({
-        ...prev,
-        users: prev.users.map(u => u.id === currentUser.id ? updatedUser : u)
-      }));
-      showToast('Foto profil berhasil diperbarui!');
-    });
-  };
-
-  const handleUpdateProfile = (e) => {
+  const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    const updatedUser = {
-      ...currentUser,
-      phone: profileForm.phone,
-      email: profileForm.email,
-      photoUrl: profileForm.photoUrl,
-      password: profileForm.newPassword ? profileForm.newPassword : currentUser.password
-    };
-    setCurrentUser(updatedUser);
-    setDb(prev => ({
-      ...prev,
-      users: prev.users.map(u => u.id === currentUser.id ? updatedUser : u)
-    }));
-    setProfileForm(prev => ({ ...prev, newPassword: '' }));
-    showToast('Pengaturan akun berhasil diperbarui!');
+    if (!supabase) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+    setSaving(true);
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('staff_profiles')
+        .update({ phone: profileForm.phone.trim() || null })
+        .eq('id', currentUser.id)
+        .select('phone')
+        .single();
+      if (profileError) throw profileError;
+
+      if (profileForm.newPassword) {
+        const { error: passwordError } = await supabase.auth.updateUser({ password: profileForm.newPassword });
+        if (passwordError) throw new Error(`Nomor telepon tersimpan, tetapi kata sandi gagal diperbarui: ${passwordError.message}`);
+      }
+
+      setCurrentUser({ ...currentUser, phone: profile?.phone || '' });
+      setProfileForm(prev => ({ ...prev, newPassword: '' }));
+      showToast('Profil petugas berhasil diperbarui.');
+    } catch (error) {
+      console.error('Gagal memperbarui profil petugas:', error);
+      showToast(`Profil gagal diperbarui: ${error.message}`, 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="max-w-2xl mx-auto">
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-5 pb-5 border-b border-slate-100">
-          <UserAvatar user={{ ...currentUser, photoUrl: profileForm.photoUrl }} size="w-20 h-20 text-2xl" />
-          <div className="space-y-2">
-            <div>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">Akun Portal Resmi</span>
-              <h3 className="font-['Poppins'] font-bold text-xl text-slate-900 mt-1">{currentUser.roleLabel}</h3>
-              <p className="text-xs text-slate-500">{SCHOOL_INFO.name} • NPSN: {SCHOOL_INFO.npsn}</p>
-            </div>
-            <div>
-              <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold cursor-pointer transition">
-                <Upload className="w-3.5 h-3.5" />
-                <span>Upload Foto Profil</span>
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-              </label>
-            </div>
-          </div>
+        <div className="pb-5 border-b border-slate-100">
+          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">Akun Portal Resmi</span>
+          <h3 className="font-['Poppins'] font-bold text-xl text-slate-900 mt-2">{currentUser.roleLabel}</h3>
+          <p className="text-xs text-slate-500">{SCHOOL_INFO.name} • NPSN: {SCHOOL_INFO.npsn}</p>
         </div>
 
         <form onSubmit={handleUpdateProfile} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Telepon Sekolah</label>
-              <input type="text" value={profileForm.phone} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Email Resmi</label>
-              <input type="email" value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Email Login</label>
+            <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600">{currentUser.email}</div>
+            <p className="text-[11px] text-slate-500 mt-1">Email login dikelola melalui Supabase Auth dan tidak diubah dari formulir ini.</p>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Ubah Kata Sandi Login ({currentUser.roleLabel})</label>
-            <input type="password" placeholder="Kosongkan jika tidak ingin mengubah kata sandi" value={profileForm.newPassword} onChange={e => setProfileForm({ ...profileForm, newPassword: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Telepon</label>
+            <input type="tel" value={profileForm.phone} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
           </div>
-          <button type="submit" className="w-full py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold shadow-sm">
-            Simpan Perubahan Akun
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Ubah Kata Sandi Login</label>
+            <input type="password" minLength={8} placeholder="Minimal 8 karakter; kosongkan jika tidak diubah" value={profileForm.newPassword} onChange={e => setProfileForm({ ...profileForm, newPassword: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
+          </div>
+          <button type="submit" disabled={saving} className="w-full py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white text-sm font-semibold shadow-sm">
+            {saving ? 'Menyimpan...' : 'Simpan Perubahan Profil'}
           </button>
         </form>
-
-        <div className="pt-4 border-t border-slate-100">
-          <button onClick={resetDemoData} className="w-full py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center justify-center gap-1.5">
-            <RefreshCw className="w-3.5 h-3.5" /> Reset Data Simulasi ke Awal
-          </button>
-        </div>
       </div>
     </div>
   );
