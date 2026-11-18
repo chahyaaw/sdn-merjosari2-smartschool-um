@@ -49,7 +49,7 @@ function getDateOffset(days = 7) {
 
 async function uploadSchoolFile(file, folder, bucket = 'school-media') {
   if (!supabase) throw new Error('Koneksi database tidak tersedia.');
-  if (!file) return null;
+  if (!file) throw new Error('Pilih file terlebih dahulu.');
   const safeName = file.name
     .replace(/[^a-zA-Z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'file';
@@ -57,10 +57,13 @@ async function uploadSchoolFile(file, folder, bucket = 'school-media') {
   const { data, error } = await supabase.storage
     .from(bucket)
     .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
-  if (error) throw error;
-  const url = bucket === 'school-media'
+  if (error) throw new Error(`Unggah ke penyimpanan gagal: ${error.message}`);
+  const url = ['school-media', 'profile-photos'].includes(bucket)
     ? supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl
     : '';
+  if (['school-media', 'profile-photos'].includes(bucket) && !url) {
+    throw new Error('File berhasil diunggah, tetapi tautan publik tidak dapat dibuat.');
+  }
   return { path: data.path, url };
 }
 
@@ -4007,7 +4010,7 @@ function AdminProfileModule() {
     try {
       let photoUrl = currentUser.photoUrl || '';
       if (selectedPhoto) {
-        const uploaded = await uploadSchoolFile(selectedPhoto, `profile-photos/${currentUser.id}`);
+        const uploaded = await uploadSchoolFile(selectedPhoto, currentUser.id, 'profile-photos');
         photoUrl = uploaded.url;
       }
 
