@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, createContext, useContext } from '
 import { supabase } from './lib/supabase';
 import {
   MapPin, Phone, Mail, Building, Sparkles,
-  ClipboardList, UserCheck, History, Send, RefreshCw, ExternalLink,
+  ClipboardList, UserCheck, History, Send, ExternalLink,
   AlertTriangle, LayoutDashboard, Menu, X,
-  Upload, Lock, User, Image as ImageIcon, Link2, Newspaper,
+  Lock, User, Image as ImageIcon, Link2, Newspaper,
   Shield, CheckCircle, LogIn, School, MessageSquare, Calendar as CalendarIcon,
   ChevronRight, Printer, Search, Eye, Download, Users, LogOut, Bell,
   Plus, Edit, Trash2
@@ -50,8 +50,7 @@ function getDateOffset(days = 7) {
 async function uploadSchoolFile(file, folder) {
   if (!supabase) throw new Error('Koneksi database tidak tersedia.');
   if (!file) return null;
-  const safeName = file.name.normalize('NFKD')
-    .replace(/[\\u0300-\\u036f]/g, '')
+  const safeName = file.name
     .replace(/[^a-zA-Z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'file';
   const path = `${folder}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
@@ -1430,7 +1429,7 @@ function PublicAspirasi() {
     setIsSubmitting(true);
     const now = new Date();
     const ticketNumber = `ASP-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const dateStr = now.toISOString().slice(0, 10);
+    const dateStr = getLocalDateString(now);
     const payload = {
       ticket_number: ticketNumber,
       sender_name: form.senderName.trim() || 'Anonim',
@@ -3088,7 +3087,7 @@ function AdminGuestbookModule() {
       const now = new Date();
       const regNumber = `GT-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const id = crypto.randomUUID();
-      const newEntry = { id, regNumber, ...form, date: now.toISOString().slice(0, 10), time: now.toTimeString().slice(0, 5), verified: true };
+      const newEntry = { id, regNumber, ...form, date: getLocalDateString(now), time: now.toTimeString().slice(0, 5), verified: true };
       const { error } = await supabase.from('guestbook').insert({
         id, reg_number: regNumber, name: form.name, institution: form.institution, phone: form.phone,
         purpose: form.purpose, destination: form.destination, notes: form.notes,
